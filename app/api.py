@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import json
 import jwt
+from pydantic import BaseModel
 import requests
 import secrets
 import sqlite3
@@ -121,11 +122,17 @@ bearer = HTTPBearer(auto_error=False)
 init_db()
 JWT_SECRET = get_setting("jwt_secret", secrets.token_urlsafe(32))
 
+class AuthCredentialsInterface(BaseModel):
+    username: str
+    password: str
+
 @V1.post("/auth/login")
 async def _v1_auth_login(
-    username: str,
-    password: str
+    body: AuthCredentialsInterface,
 ):
+    username = body.username
+    password = body.password
+
     with get_db() as db:
         result = db.execute(
             "SELECT id, password_argon2 FROM users WHERE username = ?",
@@ -155,10 +162,12 @@ async def _v1_auth_login(
 
 @V1.post("/auth/register")
 async def _v1_auth_register(
-    username: str,
-    password: str,
+    body: AuthCredentialsInterface,
     credentials: HTTPAuthorizationCredentials = Depends(bearer),
 ):
+    username = body.username
+    password = body.password
+
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(401, "missing or invalid authorization")
 
@@ -200,9 +209,11 @@ async def _v1_auth_register(
 
 @V1.post("/auth/onboarding")
 async def _v1_auth_onboarding(
-    username: str,
-    password: str,
+    body: AuthCredentialsInterface,
 ):
+    username = body.username
+    password = body.password
+
     with get_db() as db:
         user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
 
