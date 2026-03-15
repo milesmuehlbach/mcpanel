@@ -1,7 +1,8 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException as FastAPIHTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api import api
 
@@ -14,13 +15,17 @@ async def exception_handler(request: Request, exception: Exception):
         content={"message": "an error occurred?"},
     )
 
+@app.exception_handler(StarletteHTTPException)
+@app.exception_handler(FastAPIHTTPException)
+async def http_exception_handler(request: Request, exception: Exception):
+    status_code = getattr(exception, "status_code", 500)
+    detail = getattr(exception, "detail", "an error occurred?")
+    headers = getattr(exception, "headers", None)
 
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exception: HTTPException):
     return JSONResponse(
-        status_code=exception.status_code,
-        content={"message": exception.detail},
-        headers=exception.headers,
+        status_code=status_code,
+        content={"message": detail},
+        headers=headers,
     )
 
 app.include_router(api, prefix="/api")
