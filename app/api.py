@@ -114,6 +114,10 @@ def has_permissions(uid: int, required_permission: str) -> bool:
 
     return any(permission in accepted_permissions for permission in permissions)
 
+########
+# INIT #
+########
+
 ph = PasswordHasher()
 api = APIRouter()
 V1 = APIRouter(prefix="/v1")
@@ -121,6 +125,10 @@ bearer = HTTPBearer(auto_error=False)
 
 init_db()
 JWT_SECRET = get_setting("jwt_secret", secrets.token_urlsafe(32))
+
+##################
+# AUTH ENDPOINTS #
+##################
 
 class AuthCredentialsInterface(BaseModel):
     username: str
@@ -207,8 +215,18 @@ async def _v1_auth_register(
 
     return {"message": "registration successful"}
 
+@V1.get("/auth/onboarding")
+async def _v1_auth_onboarding_get():
+    with get_db() as db:
+        user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+
+    if user_count > 0:
+        return {"message": "onboarding not allowed", "status": False}
+    
+    return {"message": "onboarding allowed", "status": True}
+
 @V1.post("/auth/onboarding")
-async def _v1_auth_onboarding(
+async def _v1_auth_onboarding_post(
     body: AuthCredentialsInterface,
 ):
     username = body.username
@@ -240,19 +258,5 @@ async def _v1_auth_onboarding(
         )
 
     return {"message": "onboarding successful"}
-
-# TODO: demo endpoint @milesmuehlbach
-@V1.get("/minecraft-versions")
-async def _v1_minecraft_versions(snapshot: bool = False):
-    data = requests.get(
-        "https://launchermeta.mojang.com/mc/game/version_manifest.json"
-    ).json()
-
-    versions = data["versions"]
-
-    if not snapshot:
-        versions = [v for v in versions if v["type"] == "release"]
-
-    return versions
 
 api.include_router(V1)
