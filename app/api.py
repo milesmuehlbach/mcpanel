@@ -5,9 +5,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import json
 import jwt
 from pydantic import BaseModel
-import requests
 import secrets
 import sqlite3
+
+from app.downloaders import java
 
 def _normalize_permissions(value: object) -> list[str]:
     if not isinstance(value, list):
@@ -258,5 +259,37 @@ async def _v1_auth_onboarding_post(
         )
 
     return {"message": "onboarding successful"}
+
+#######################
+# COMPONENT ENDPOINTS #
+#######################
+
+@V1.get("/components/list")
+async def _v1_components_list(
+    type: str,
+    credentials: HTTPAuthorizationCredentials = Depends(bearer),
+):
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(401, "missing or invalid authorization")
+
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=["HS256"])
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, "invalid or expired token")
+
+    uid = payload.get("id")
+    if not isinstance(uid, int):
+        raise HTTPException(401, "invalid token payload")
+
+    if not has_permissions(uid, "components.list_components"):
+        raise HTTPException(403, "insufficient permissions")
+    
+    # BEGIN REQUEST BODY
+
+    match type:
+        case "jre":
+            return {"message": "success", "components": java.get_available_runtimes()}
+        case _:
+            raise HTTPException(400, "invalid component type")
 
 api.include_router(V1)

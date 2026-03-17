@@ -4,6 +4,7 @@ import io
 import json
 import pathlib
 import platform
+import requests
 import shutil
 import stat
 import subprocess
@@ -12,8 +13,6 @@ import tempfile
 import threading
 from typing import Any
 import zipfile
-
-import requests
 
 try:
     import lzma
