@@ -131,6 +131,33 @@ JWT_SECRET = get_setting("jwt_secret", secrets.token_urlsafe(32))
 # AUTH ENDPOINTS #
 ##################
 
+def get_user_id(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+) -> int:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(401, "missing or invalid authorization")
+
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=["HS256"])
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, "invalid or expired token")
+
+    uid = payload.get("id")
+    if not isinstance(uid, int):
+        raise HTTPException(401, "invalid token payload")
+
+    return uid
+
+def require_permission(required_permission: str):
+    def dependency(
+        uid: int = Depends(get_user_id),
+    ) -> None:
+        # implicitly requires formal auth
+        if not has_permissions(uid, required_permission):
+            raise HTTPException(403, "insufficient permissions")
+
+    return dependency
+
 class AuthCredentialsInterface(BaseModel):
     username: str
     password: str
@@ -169,28 +196,15 @@ async def _v1_auth_login(
 
     return {"message": "login successful", "token": token}
 
-@V1.post("/auth/register")
+@V1.post(
+    "/auth/register",
+    dependencies=[Depends(require_permission("users.register_user"))],
+)
 async def _v1_auth_register(
     body: AuthCredentialsInterface,
-    credentials: HTTPAuthorizationCredentials = Depends(bearer),
 ):
     username = body.username
     password = body.password
-
-    if credentials is None or credentials.scheme.lower() != "bearer":
-        raise HTTPException(401, "missing or invalid authorization")
-
-    try:
-        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=["HS256"])
-    except jwt.InvalidTokenError:
-        raise HTTPException(401, "invalid or expired token")
-
-    uid = payload.get("id")
-    if not isinstance(uid, int):
-        raise HTTPException(401, "invalid token payload")
-
-    if not has_permissions(uid, "users.register_user"):
-        raise HTTPException(403, "insufficient permissions")
 
     username = username.strip()
     if not username or len(username) > 32:
@@ -264,28 +278,13 @@ async def _v1_auth_onboarding_post(
 # COMPONENT ENDPOINTS #
 #######################
 
-@V1.get("/components/list")
+@V1.get(
+    "/components/list",
+    dependencies=[Depends(require_permission("components.list_components"))],
+)
 async def _v1_components_list(
     type: str,
-    credentials: HTTPAuthorizationCredentials = Depends(bearer),
 ):
-    if credentials is None or credentials.scheme.lower() != "bearer":
-        raise HTTPException(401, "missing or invalid authorization")
-
-    try:
-        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=["HS256"])
-    except jwt.InvalidTokenError:
-        raise HTTPException(401, "invalid or expired token")
-
-    uid = payload.get("id")
-    if not isinstance(uid, int):
-        raise HTTPException(401, "invalid token payload")
-
-    if not has_permissions(uid, "components.list_components"):
-        raise HTTPException(403, "insufficient permissions")
-    
-    # BEGIN REQUEST BODY
-
     match type:
         case "jre":
             return {"message": "success", "components": java.get_available_runtimes()}
