@@ -127,10 +127,6 @@ bearer = HTTPBearer(auto_error=False)
 init_db()
 JWT_SECRET = get_setting("jwt_secret", secrets.token_urlsafe(32))
 
-##################
-# AUTH ENDPOINTS #
-##################
-
 def get_user_id(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
 ) -> int:
@@ -158,9 +154,17 @@ def require_permission(required_permission: str):
 
     return dependency
 
+##################
+# AUTH ENDPOINTS #
+##################
+
 class AuthCredentialsInterface(BaseModel):
     username: str
     password: str
+
+class AuthPermissionsInterface(BaseModel):
+    user_id: int | None = None
+    permissions: dict[str, bool]
 
 @V1.post("/auth/login")
 async def _v1_auth_login(
@@ -275,19 +279,62 @@ async def _v1_auth_onboarding_post(
     return {"message": "onboarding successful"}
 
 @V1.get("/auth/permissions")
-async def _v1_auth_permissions(
+async def _v1_auth_permissions_get(
+    uid: int = Depends(get_user_id),
+    user_id: int | None = None,
+):
+    target_uid = uid
+    if user_id is not None and user_id != uid:
+        if not has_permissions(uid, "permissions.view_permissions"):
+            raise HTTPException(403, "insufficient permissions")
+        target_uid = user_id
+
+    permissions = get_user_permissions(target_uid)
+
+    return {"message": "success", "permissions": permissions}
+
+@V1.post(
+    "/auth/permissions",
+    dependencies=[Depends(require_permission("permissions.set_permissions"))],
+)
+async def _v1_auth_permissions_post(
+    body: AuthPermissionsInterface,
     uid: int = Depends(get_user_id),
 ):
+    target_uid = uid if body.user_id is None else body.user_id
+    target_permissions = set(get_user_permissions(target_uid))
+    updated_permissions = set(target_permissions)
+    is_other_user = target_uid != uid
+
+    for permission, enabled in body.permissions.items():
+        permission = permission.strip()
+        if not permission:
+            raise HTTPException(400, "invalid permission")
+
+        if is_other_user and not has_permissions(uid, permission):
+            raise HTTPException(403, "insufficient permissions")
+
+        if not enabled:
+            if is_other_user and not has_permissions(uid, "permissions.view_permissions"):
+                raise HTTPException(403, "insufficient permissions")
+
+            if not is_other_user and permission == "admin" and "admin" in target_permissions:
+                continue
+
+            updated_permissions.discard(permission)
+            continue
+
+        updated_permissions.add(permission)
+
+    normalized_permissions = sorted(updated_permissions)
+
     with get_db() as db:
-        result = db.execute(
-            "SELECT permissions FROM users WHERE id = ?",
-            (uid,),
-        ).fetchone()
+        db.execute(
+            "UPDATE users SET permissions = ? WHERE id = ?",
+            (json.dumps(normalized_permissions), target_uid),
+        )
 
-    if result is None:
-        raise HTTPException(404, "user not found")
-
-    return {"message": "success", "permissions": json.loads(result[0])}
+    return {"message": "success", "permissions": normalized_permissions}
 
 #######################
 # COMPONENT ENDPOINTS #
