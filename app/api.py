@@ -274,6 +274,21 @@ async def _v1_auth_onboarding_post(
 
     return {"message": "onboarding successful"}
 
+@V1.get("/auth/permissions")
+async def _v1_auth_permissions(
+    uid: int = Depends(get_user_id),
+):
+    with get_db() as db:
+        result = db.execute(
+            "SELECT permissions FROM users WHERE id = ?",
+            (uid,),
+        ).fetchone()
+
+    if result is None:
+        raise HTTPException(404, "user not found")
+
+    return {"message": "success", "permissions": json.loads(result[0])}
+
 #######################
 # COMPONENT ENDPOINTS #
 #######################
