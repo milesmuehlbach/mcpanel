@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException as FastAPIHTTPException, Request
 from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
 from app.api import api
 
 app = FastAPI(title="mcpanel")
@@ -12,6 +14,7 @@ async def exception_handler(request: Request, exception: Exception):
         content={"message": "an error occurred?"},
     )
 
+@app.exception_handler(StarletteHTTPException)
 @app.exception_handler(FastAPIHTTPException)
 async def http_exception_handler(request: Request, exception: Exception):
     status_code = getattr(exception, "status_code", 500)
