@@ -1,14 +1,17 @@
 from argon2 import PasswordHasher
+from dataclasses import asdict
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import json
 import jwt
+from pathlib import Path
 from pydantic import BaseModel
 import secrets
 import sqlite3
 
 from app.downloaders import java
+from app.tasks import TaskManager
 
 def _normalize_permissions(value: object) -> list[str]:
     if not isinstance(value, list):
@@ -126,6 +129,7 @@ bearer = HTTPBearer(auto_error=False)
 
 init_db()
 JWT_SECRET = get_setting("jwt_secret", secrets.token_urlsafe(32))
+task_manager = TaskManager()
 
 def get_user_id(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
@@ -168,7 +172,7 @@ class AuthPermissionsInterface(BaseModel):
 
 @V1.post("/auth/login")
 async def _v1_auth_login(
-    body: AuthCredentialsInterface,
+    body: AuthCredentialsInterface
 ):
     username = body.username
     password = body.password
@@ -205,7 +209,7 @@ async def _v1_auth_login(
     dependencies=[Depends(require_permission("users.register_user"))],
 )
 async def _v1_auth_register(
-    body: AuthCredentialsInterface,
+    body: AuthCredentialsInterface
 ):
     username = body.username
     password = body.password
@@ -246,7 +250,7 @@ async def _v1_auth_onboarding_get():
 
 @V1.post("/auth/onboarding")
 async def _v1_auth_onboarding_post(
-    body: AuthCredentialsInterface,
+    body: AuthCredentialsInterface
 ):
     username = body.username
     password = body.password
@@ -281,7 +285,7 @@ async def _v1_auth_onboarding_post(
 @V1.get("/auth/permissions")
 async def _v1_auth_permissions_get(
     uid: int = Depends(get_user_id),
-    user_id: int | None = None,
+    user_id: int | None = None
 ):
     target_uid = uid
     if user_id is not None and user_id != uid:
@@ -299,7 +303,7 @@ async def _v1_auth_permissions_get(
 )
 async def _v1_auth_permissions_post(
     body: AuthPermissionsInterface,
-    uid: int = Depends(get_user_id),
+    uid: int = Depends(get_user_id)
 ):
     target_uid = uid if body.user_id is None else body.user_id
     target_permissions = set(get_user_permissions(target_uid))
@@ -340,9 +344,13 @@ async def _v1_auth_permissions_post(
 # COMPONENT ENDPOINTS #
 #######################
 
+class ComponentInstallInterface(BaseModel):
+    uid: str
+    sha256: str
+
 @V1.get(
     "/components/list",
-    dependencies=[Depends(require_permission("components.list_components"))],
+    dependencies=[Depends(require_permission("components.list_components"))]
 )
 async def _v1_components_list(
     type: str,
@@ -352,5 +360,52 @@ async def _v1_components_list(
             return {"message": "success", "components": java.get_available_runtimes()}
         case _:
             raise HTTPException(400, "invalid component type")
+
+@V1.post(
+    "/components/install",
+    dependencies=[Depends(require_permission("components.install_component"))],
+)
+async def _v1_components_install(
+    body: ComponentInstallInterface
+):
+    match body.uid.strip().split(":", 1)[0]:
+        case "jre":
+            task_id = task_manager.enqueue(
+                java.download_runtime,
+                body.uid,
+                body.sha256,
+                Path("./minecraft"),
+                name=f"Install JRE ({body.uid})",
+            )
+            return {"message": "success", "task_id": task_id}
+        case _:
+            raise HTTPException(400, "invalid component type")
+
+##################
+# TASK ENDPOINTS #
+##################
+
+@V1.get(
+    "/tasks/list",
+    dependencies=[Depends(require_permission("tasks.list_tasks"))]
+)
+async def _v1_tasks_list():
+    return {
+        "message": "success",
+        "tasks": [asdict(task) for task in task_manager.list_tasks()],
+    }
+
+@V1.get(
+    "/tasks/status",
+    dependencies=[Depends(require_permission("tasks.get_status"))]
+)
+async def _v1_tasks_status(
+    task_id: str
+):
+    task = task_manager.get_task(task_id)
+    if not task:
+        raise HTTPException(404, "task not found")
+    return {"message": "success", "task": asdict(task)}
+
 
 api.include_router(V1)
