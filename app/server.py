@@ -36,12 +36,10 @@ app.mount("/assets", StaticFiles(directory="build/assets"))
 app.mount("/app/_app", StaticFiles(directory="build/_app"))
 app.mount("/app/assets", StaticFiles(directory="build/assets"))
 
+
+# buddy WHAT are we doin, this is an oss self hostable panel we don't need a fucking landing page :sob:
 @app.get("/")
 async def _root():
-    return FileResponse("build/landing.html")
-
-@app.get("/app")
-async def _app():
     return FileResponse("build/index.html")
 
 @app.get("/favicon.ico")
