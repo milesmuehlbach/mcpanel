@@ -31,13 +31,7 @@ app.include_router(api, prefix="/api")
 
 app.mount("/_app", StaticFiles(directory="build/_app"))
 app.mount("/assets", StaticFiles(directory="build/assets"))
-# Also mount under /app so that relative asset paths still resolve when the app is
-# accessed via /app/ (trailing slash browsers may request /app/_app/... ).
-app.mount("/app/_app", StaticFiles(directory="build/_app"))
-app.mount("/app/assets", StaticFiles(directory="build/assets"))
 
-
-# buddy WHAT are we doin, this is an oss self hostable panel we don't need a fucking landing page :sob:
 @app.get("/")
 async def _root():
     return FileResponse("build/index.html")
