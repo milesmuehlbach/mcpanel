@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import json
 import jwt
+import os
 from pathlib import Path
 from pydantic import BaseModel
 import secrets
@@ -12,6 +13,11 @@ import sqlite3
 
 from app.downloaders import java
 from app.tasks import TaskManager
+
+WORKING_PATH_ENV = "MCPANEL_PATH"
+
+def get_workdir() -> Path:
+    return Path(os.environ.get(WORKING_PATH_ENV, "./minecraft")).resolve()
 
 def _normalize_permissions(value: object) -> list[str]:
     if not isinstance(value, list):
@@ -374,7 +380,7 @@ async def _v1_components_install(
                 java.download_runtime,
                 body.uid,
                 body.sha256,
-                Path("./minecraft"),
+                get_workdir(),
                 name=f"Install JRE ({body.uid})",
             )
             return {"message": "success", "task_id": task_id}

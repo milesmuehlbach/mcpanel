@@ -1,6 +1,25 @@
+import argparse
+import os
+import pathlib
 import uvicorn
 
-from app.server import app
+from app.api import WORKING_PATH_ENV as APP_PATH_ENV
+
+def app_factory():
+    from app.server import app
+    return app
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
+    parser = argparse.ArgumentParser(description="Comprehensive Minecraft server management panel")
+    parser.add_argument(
+        "--path",
+        "-p",
+        type=pathlib.Path,
+        default=pathlib.Path("./minecraft"),
+        help="path to the working directory (default: ./minecraft)",
+    )
+    args = parser.parse_args()
+
+    os.environ[APP_PATH_ENV] = str(args.path.resolve())
+
+    uvicorn.run("main:app_factory", host="0.0.0.0", port=8080, reload=True, factory=True)
