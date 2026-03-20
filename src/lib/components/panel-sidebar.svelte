@@ -3,7 +3,9 @@
 </script>
 
 <Sidebar.Root>
-	<Sidebar.Header />
+	<Sidebar.Header>
+		<h1>McPanel</h1>
+	</Sidebar.Header>
 	<Sidebar.Content>
 		<Sidebar.Group />
 		<Sidebar.Group />
