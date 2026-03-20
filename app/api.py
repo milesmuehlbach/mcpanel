@@ -7,11 +7,12 @@ import json
 import jwt
 import os
 from pathlib import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, StringConstraints
 import secrets
 import sqlite3
+from typing import Annotated
 
-from app.downloaders import java
+from app.downloaders import java, server
 from app.tasks import TaskManager
 
 WORKING_PATH_ENV = "MCPANEL_PATH"
@@ -350,9 +351,15 @@ async def _v1_auth_permissions_post(
 # COMPONENT ENDPOINTS #
 #######################
 
+MD5Hash = Annotated[str, StringConstraints(pattern=r"^[a-fA-F0-9]{32}$")]
+SHA1Hash = Annotated[str, StringConstraints(pattern=r"^[a-fA-F0-9]{40}$")]
+SHA256Hash = Annotated[str, StringConstraints(pattern=r"^[a-fA-F0-9]{64}$")]
+
 class ComponentInstallInterface(BaseModel):
     uid: str
-    sha256: str
+    md5: MD5Hash | None = None
+    sha1: SHA1Hash | None = None
+    sha256: SHA256Hash | None = None
 
 @V1.get(
     "/components/list",
@@ -364,6 +371,8 @@ async def _v1_components_list(
     match type:
         case "jre":
             return {"message": "success", "components": java.get_available_runtimes()}
+        case "server":
+            return {"message": "success", "components": server.get_available_versions()}
         case _:
             raise HTTPException(400, "invalid component type")
 
@@ -376,12 +385,32 @@ async def _v1_components_install(
 ):
     match body.uid.strip().split(":", 1)[0]:
         case "jre":
+            sha256 = body.sha256.strip() if body.sha256 is not None else ""
+            if not sha256:
+                raise HTTPException(400, "sha256 is required for jre installation")
+
             task_id = task_manager.enqueue(
                 java.download_runtime,
                 body.uid,
-                body.sha256,
+                sha256,
                 get_workdir(),
                 name=f"Install JRE ({body.uid})",
+            )
+            return {"message": "success", "task_id": task_id}
+        case "server":
+            # TODO: only accepted hash is SHA1 because only implemented server downloader is Mojang
+            # will be changed if other server type downloaders necessitate so
+
+            sha1 = body.sha1.strip() if body.sha1 is not None else ""
+            if not sha1:
+                raise HTTPException(400, "sha1 is required for server installation")
+
+            task_id = task_manager.enqueue(
+                server.download_version,
+                body.uid,
+                sha1,
+                get_workdir(),
+                name=f"Install Server ({body.uid})",
             )
             return {"message": "success", "task_id": task_id}
         case _:

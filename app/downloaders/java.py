@@ -393,10 +393,10 @@ def get_available_runtimes():
     try:
         json = r.json()
     except:
-        raise ValueError(f"upstream error in prism metadata: invalid json")
+        raise ValueError("upstream error in prism metadata: invalid json")
 
     if json.get("formatVersion") != 1:
-        raise ValueError(f"upstream error in prism metadata: unsupported format version")
+        raise ValueError("upstream error in prism metadata: unsupported format version")
 
     valid_uids = {}
     for package in json.get("packages", []):
@@ -404,11 +404,11 @@ def get_available_runtimes():
             valid_uids[package.get("uid")] = package.get("sha256")
     
     entries = []
-    for uid, sha256 in valid_uids.items():
-        r = s.get(PRISM_META_URL + uid + "/index.json")
+    for id, sha256 in valid_uids.items():
+        r = s.get(PRISM_META_URL + id + "/index.json")
 
         if hashlib.sha256(r.content).hexdigest() != sha256:
-            raise ValueError(f"upstream error in prism metadata: sha256 mismatch for {uid}")        
+            raise ValueError(f"upstream error in prism metadata: sha256 mismatch for {id}")        
         
         try:
             json = r.json()
@@ -418,23 +418,32 @@ def get_available_runtimes():
         if json.get("formatVersion") != 1:
             raise ValueError(f"upstream error in prism metadata: unsupported format version")
         
-        if json.get("uid") != uid:
-            raise ValueError(f"upstream error in prism metadata: uid mismatch for {uid}")
+        if json.get("uid") != id:
+            raise ValueError(f"upstream error in prism metadata: uid mismatch for {id}")
         
         for version in json.get("versions", []):
+            display_type = "Java"
+            display_component = {"net.minecraft.java": "OpenJDK", "com.azul.java": "Azul", "net.adoptium.java": "Adoptium"}.get(id, id)
+            display_version = version.get("version").replace("java", "")
+            
             entries.append(
                 {
-                    "uid": f"jre:{uid}:{version.get('version')}",
+                    "uid": f"jre:{id}:{version.get('version')}",
                     "type": "jre",
-                    "component": uid,
+                    "component": id,
                     "version": version.get("version"),
-                    "display_type": "Runtime",
-                    "display_component": {"net.minecraft.java": "OpenJDK", "com.azul.java": "Azul", "net.adoptium.java": "Adoptium"}.get(uid, uid),
-                    "display_version": version.get("version"),
-                    "sha256": version.get("sha256"),
+                    "display_type": display_type,
+                    "display_component": display_component,
+                    "display_version": display_version,
+                    "display_name": f"{display_component} {display_type} {display_version}",
+                    "hashes": {
+                        "md5": version.get("md5"),
+                        "sha1": version.get("sha1"),
+                        "sha256": version.get("sha256") # only sha256 should be present in prism metadata
+                    },
                     "released_at": version.get("releaseTime"),
                 }
-            ) 
+            )
 
     return entries
 
