@@ -368,6 +368,8 @@ class ComponentInstallInterface(BaseModel):
 async def _v1_components_list(
     type: str,
 ):
+    # TODO: query and cache available components on init
+    
     match type:
         case "jre":
             return {"message": "success", "components": java.get_available_runtimes()}
@@ -405,17 +407,21 @@ async def _v1_components_install(
             )
             return {"message": "success", "task_id": task_id}
         case "server":
-            # TODO: only accepted hash is SHA1 because only implemented server downloader is Mojang
-            # will be changed if other server type downloaders necessitate so
+            server_type = body.uid.strip().split(":")[1]
+            hash = None
 
-            sha1 = body.sha1.strip() if body.sha1 is not None else ""
-            if not sha1:
-                raise HTTPException(400, "sha1 is required for server installation")
+            match server_type:
+                case "mojang":
+                    hash = body.sha1.strip() if body.sha1 is not None else ""
+                    if not hash:
+                        raise HTTPException(400, "sha1 is required for mojang server installation")
+                case "paper":
+                    hash = None # setting it again here for clarity
 
             task_id = task_manager.enqueue(
                 server.download_version,
                 body.uid,
-                sha1,
+                hash,
                 get_workdir(),
                 name=f"Install Server ({body.uid})",
             )
