@@ -383,6 +383,13 @@ async def _v1_components_list(
 async def _v1_components_install(
     body: ComponentInstallInterface
 ):
+    ##############################################################################################
+    # future TODO: 1. save size and hash data of installed components in db                      #
+    #              2. verify integrity of installed components on launch                         #
+    #              3. uninstall components?/repair them? (idk) if integrity check fails          #
+    # probably around the time we implement component database, management, uninstallation, etc. #
+    ##############################################################################################
+
     match body.uid.strip().split(":", 1)[0]:
         case "jre":
             sha256 = body.sha256.strip() if body.sha256 is not None else ""

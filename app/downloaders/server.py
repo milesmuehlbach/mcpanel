@@ -1,3 +1,4 @@
+import hashlib
 import pathlib
 import requests
 
@@ -35,10 +36,7 @@ class MojangDownloader(ServerDownloader):
             }{
                 version.get("id")
             }"
-
-            # uid format:
-            # server:mojang:release-1.21.11
-
+            
             entries.append(
                 {
                     "uid": f"server:mojang:{version.get('type')}-{version.get('id')}",
@@ -62,7 +60,60 @@ class MojangDownloader(ServerDownloader):
     
     @staticmethod
     def download_version(uid: str, hash: str | None, base_path: pathlib.Path) -> None:
-        pass
+        s = requests.Session()
+        r = s.get(MojangDownloader.MOJANG_MANIFEST_URL)
+        r.raise_for_status()
+        
+        try:
+            json = r.json()
+        except:
+            raise ValueError("upstream error in mojang metadata: invalid json")
+        
+        for version in json.get("versions", []):
+            if f"server:mojang:{version.get('type')}-{version.get('id')}" != uid: continue
+
+            r = s.get(version.get("url"))
+            r.raise_for_status()
+
+            if hashlib.sha1(r.content).hexdigest() != hash:
+                raise ValueError("upstream error in mojang metadata: hash mismatch in version metadata")
+            
+            try:
+                json = r.json()
+            except:
+                raise ValueError("upstream error in mojang metadata: invalid json")
+
+            server = json.get("downloads", {}).get("server", {})
+            url = server.get("url")
+            sha1 = server.get("sha1")
+            size_bytes = server.get("size")
+
+            if not isinstance(url, str) or not url:
+                raise ValueError("upstream error in mojang metadata: missing server url")
+
+            if not isinstance(sha1, str) or not sha1:
+                raise ValueError("upstream error in mojang metadata: missing server sha1")
+
+            if not isinstance(size_bytes, int) or size_bytes < 0:
+                raise ValueError("upstream error in mojang metadata: missing server size")
+
+            server_response = s.get(url)
+            server_response.raise_for_status()
+
+            server_bytes = server_response.content
+            if len(server_bytes) != size_bytes:
+                raise ValueError("downloaded server size mismatch")
+
+            if hashlib.sha1(server_bytes).hexdigest() != sha1:
+                raise ValueError("downloaded server sha1 mismatch")
+
+            jar_path = base_path / "jar" / f"{uid.replace(':', '_')}.jar"
+            jar_path.parent.mkdir(parents=True, exist_ok=True)
+            jar_path.write_bytes(server_bytes)
+
+            return
+
+        raise ValueError(f"unknown mojang server version uid: {uid}")
 
 DOWNLOADERS = {
     "mojang": MojangDownloader
@@ -75,8 +126,8 @@ def get_available_versions() -> list[dict]:
     return entries
 
 def download_version(uid: str, hash: str | None, base_path: pathlib.Path) -> None:
-    for downloader_cls in DOWNLOADERS.values():
-        if uid.startswith(f"server:{downloader_cls.__name__.lower()}:"):
+    for server_type, downloader_cls in DOWNLOADERS.items():
+        if uid.startswith(f"server:{server_type}:"):
             return downloader_cls.download_version(uid, hash, base_path)
     
     raise ValueError(f"unknown server version uid: {uid}")
