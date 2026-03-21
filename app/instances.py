@@ -63,8 +63,20 @@ class Instance:
         self.path = self.base_path / "instances" / str(uuid)
         self.json = self.path / "instance.json"
 
+        now = _utcnow()
+        self.created_at = now
+        self.updated_at = now
+
+        self._name = ""
+        self._jar = None
+        self._java = None
+        self._memory = DEFAULT_MB
+        self._arguments = list(DEFAULT_ARGUMENTS)
+        self._persistence = False
+
         self.set_defaults()
         self.load_instance_config()
+        self._persistence = True
 
         self.process = None
         self.running = False
@@ -73,14 +85,92 @@ class Instance:
     def set_defaults(self):
         now = _utcnow()
 
-        self.name = f"My Instance {self.uuid.hex[:8]}"
-        self.jar = None
-        self.java = None
-        self.memory = DEFAULT_MB
-        self.arguments = list(DEFAULT_ARGUMENTS)
+        self._name = f"My Instance {self.uuid.hex[:8]}"
+        self._jar = None
+        self._java = None
+        self._memory = DEFAULT_MB
+        self._arguments = list(DEFAULT_ARGUMENTS)
 
         self.created_at = now
         self.updated_at = now
+    
+    def build_info(self) -> dict:
+        return {
+            "version": 1,
+            "uuid": str(self.uuid),
+            "name": self.name,
+            "jar": self.jar,
+            "java": self.java,
+            "memory": self.memory,
+            "arguments": list(self.arguments),
+            "created_at": _to_epoch_seconds(self.created_at),
+            "updated_at": _to_epoch_seconds(self.updated_at)
+        }
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @name.setter
+    def name(self, value: str):
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("name must be a non-empty string")
+        self._name = value
+        self.updated_at = _utcnow()
+        if self._persistence:
+            self.save_instance_config()
+
+    @property
+    def jar(self) -> str | None:
+        return self._jar
+
+    @jar.setter
+    def jar(self, value: str | None):
+        if value is not None and not isinstance(value, str):
+            raise ValueError("jar must be a string or None")
+        self._jar = value
+        self.updated_at = _utcnow()
+        if self._persistence:
+            self.save_instance_config()
+
+    @property
+    def java(self) -> str | None:
+        return self._java
+
+    @java.setter
+    def java(self, value: str | None):
+        if value is not None and not isinstance(value, str):
+            raise ValueError("java must be a string or None")
+        self._java = value
+        self.updated_at = _utcnow()
+        if self._persistence:
+            self.save_instance_config()
+
+    @property
+    def memory(self) -> int:
+        return self._memory
+
+    @memory.setter
+    def memory(self, value: int):
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise ValueError("memory must be a positive integer")
+        self._memory = value
+        self.updated_at = _utcnow()
+        if self._persistence:
+            self.save_instance_config()
+
+    @property
+    def arguments(self) -> list[str]:
+        return list(self._arguments)
+
+    @arguments.setter
+    def arguments(self, value: list[str]):
+        if not isinstance(value, list) or not all(isinstance(argument, str) for argument in value):
+            raise ValueError("arguments must be a list of strings")
+        self._arguments = list(value)
+        self.updated_at = _utcnow()
+        if self._persistence:
+            self.save_instance_config()
 
     def load_instance_config(self):
         try:
@@ -99,23 +189,23 @@ class Instance:
                 case 1:
                     name = config.get("name")
                     if isinstance(name, str) and name.strip():
-                        self.name = name
+                        self._name = name
 
                     jar = config.get("jar")
                     if jar is None or isinstance(jar, str):
-                        self.jar = jar
+                        self._jar = jar
 
                     java = config.get("java")
                     if java is None or isinstance(java, str):
-                        self.java = java
+                        self._java = java
 
                     memory = config.get("memory")
                     if isinstance(memory, int) and not isinstance(memory, bool) and memory > 0:
-                        self.memory = memory
+                        self._memory = memory
 
                     arguments = config.get("arguments")
                     if isinstance(arguments, list) and all(isinstance(argument, str) for argument in arguments):
-                        self.arguments = list(arguments)
+                        self._arguments = list(arguments)
 
                     created_at = config.get("created_at")
                     if _is_valid_timestamp(created_at):
@@ -128,22 +218,8 @@ class Instance:
                     return
 
     def save_instance_config(self):
-        self.updated_at = _utcnow()
-
-        config = {
-            "version": 1,
-            "uuid": str(self.uuid),
-            "name": self.name,
-            "jar": self.jar,
-            "java": self.java,
-            "memory": self.memory,
-            "arguments": list(self.arguments),
-            "created_at": _to_epoch_seconds(self.created_at),
-            "updated_at": _to_epoch_seconds(self.updated_at)
-        }
-
         self.path.mkdir(parents=True, exist_ok=True)
-        self.json.write_text(json.dumps(config, indent=4), encoding="utf-8")
+        self.json.write_text(json.dumps(self.build_info(), indent=4), encoding="utf-8")
     
     @staticmethod
     def create_instance(base_path: pathlib.Path, server_uid: str, java_uid: str, name: str | None = None, memory: int | None = None, arguments: list[str] | None = None) -> Instance:
@@ -295,5 +371,130 @@ class Instance:
 
 class InstanceManager:
     def __init__(self, base_path: pathlib.Path):
-        self.base_path = base_path
+        self.base_path = base_path.resolve()
         self.instances: list[Instance] = []
+        self._instances_by_uuid: dict[uuid.UUID, Instance] = {}
+
+        self.scan_instances(replace=True)
+
+    @staticmethod
+    def _normalize_uuid(value: uuid.UUID | str) -> uuid.UUID:
+        if isinstance(value, uuid.UUID):
+            return value
+        if isinstance(value, str):
+            return uuid.UUID(value)
+        raise TypeError("instance uuid must be a uuid.UUID or string")
+
+    @property
+    def instance_root(self) -> pathlib.Path:
+        return (self.base_path / "instances").resolve()
+
+    def list_instances(self) -> list[Instance]:
+        return list(self.instances)
+    
+    def list_instance_overviews(self) -> list[dict]:
+        return [instance.build_info() for instance in self.instances]
+
+    def has_instance(self, instance_uuid: uuid.UUID | str) -> bool:
+        normalized_uuid = self._normalize_uuid(instance_uuid)
+        return normalized_uuid in self._instances_by_uuid
+
+    def get_instance(self, instance_uuid: uuid.UUID | str) -> Instance:
+        normalized_uuid = self._normalize_uuid(instance_uuid)
+        instance = self._instances_by_uuid.get(normalized_uuid)
+        if instance is None:
+            raise KeyError(f"instance '{normalized_uuid}' is not loaded")
+        return instance
+
+    def reload_instance(self, instance_uuid: uuid.UUID | str) -> Instance:
+        normalized_uuid = self._normalize_uuid(instance_uuid)
+        instance = Instance(normalized_uuid, self.base_path)
+        instance.save_instance_config() # ensure config is saved with any legacy conversions, if necessary
+        self._instances_by_uuid[normalized_uuid] = instance
+        self.instances = list(self._instances_by_uuid.values())
+        return instance
+
+    def scan_instances(self, replace: bool = True) -> list[Instance]:
+        instance_root = self.instance_root
+        if not instance_root.exists():
+            if replace:
+                self.instances = []
+                self._instances_by_uuid = {}
+            return self.list_instances()
+        if not instance_root.is_dir() or instance_root.is_symlink():
+            raise ValueError(f"unexpected instances path: {instance_root}")
+
+        scanned_instances: dict[uuid.UUID, Instance] = {}
+        for entry in instance_root.iterdir():
+            if not entry.is_dir() or entry.is_symlink():
+                continue
+
+            try:
+                instance_uuid = uuid.UUID(entry.name)
+                instance = Instance(instance_uuid, self.base_path)
+                instance.save_instance_config() # ensure config is saved with any legacy conversions, if necessary
+                scanned_instances[instance_uuid] = instance
+            except Exception as e:
+                print(f"skipping invalid instance directory '{entry}': {e}")
+
+        if replace:
+            self._instances_by_uuid = scanned_instances
+        else:
+            self._instances_by_uuid.update(scanned_instances)
+
+        self.instances = list(self._instances_by_uuid.values())
+        return self.list_instances()
+
+    def create_instance(self, server_uid: str, java_uid: str, name: str | None = None, memory: int | None = None, arguments: list[str] | None = None) -> Instance:
+        instance = Instance.create_instance(
+            self.base_path,
+            server_uid,
+            java_uid,
+            name=name,
+            memory=memory,
+            arguments=arguments,
+        )
+        self._instances_by_uuid[instance.uuid] = instance
+        self.instances = list(self._instances_by_uuid.values())
+        return instance
+
+    def delete_instance(self, instance_uuid: uuid.UUID | str) -> None:
+        normalized_uuid = self._normalize_uuid(instance_uuid)
+        existing = self._instances_by_uuid.get(normalized_uuid)
+        if existing is not None and existing.running:
+            raise RuntimeError(f"instance '{normalized_uuid}' is running; stop it before deletion")
+
+        Instance.delete_instance(self.base_path, normalized_uuid)
+
+        self._instances_by_uuid.pop(normalized_uuid, None)
+        self.instances = list(self._instances_by_uuid.values())
+
+    def start_instance(self, instance_uuid: uuid.UUID | str) -> Instance:
+        instance = self.get_instance(instance_uuid)
+        instance.start()
+        return instance
+
+    def stop_instance(self, instance_uuid: uuid.UUID | str) -> Instance:
+        instance = self.get_instance(instance_uuid)
+        instance.stop() # see earlier notes about non-blocking instance stopping
+        return instance
+
+    def restart_instance(self, instance_uuid: uuid.UUID | str) -> Instance:
+        instance = self.get_instance(instance_uuid)
+        if instance.running:
+            instance.stop() # see earlier notes about non-blocking instance stopping
+        instance.start()
+        return instance
+
+    def stop_all(self) -> list[tuple[uuid.UUID, Exception]]:
+        errors: list[tuple[uuid.UUID, Exception]] = []
+        for instance in list(self.instances):
+            if not instance.running:
+                continue
+
+            try:
+                instance.stop()
+            except Exception as e:
+                errors.append((instance.uuid, e))
+
+        return errors
