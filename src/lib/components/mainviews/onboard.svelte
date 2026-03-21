@@ -14,9 +14,11 @@
 
 	let username = $state('');
 	let password = $state('');
+	let confirmPassword = $state('');
 	let errordis = $state('');
 	const usernameRegex = /^[A-Za-z0-9_-]+$/;
 	let isUsernameValid = $derived(username === '' || usernameRegex.test(username));
+	let passwordsMatch = $derived(password === confirmPassword);
 
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
@@ -26,8 +28,13 @@
 			return;
 		}
 
+		if (!passwordsMatch) {
+			console.error('Passwords do not match');
+			return;
+		}
+
 		try {
-			const response = await fetch('/api/v1/auth/login', {
+			const response = await fetch('/api/v1/auth/onboarding', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -37,13 +44,13 @@
 
 			if (response.ok) {
 				const data = await response.json();
-				console.log('Login successful:', data);
-				errordis = 'Login Successful : ' + data.message;
+				console.log('Register successful:', data);
+				errordis = 'Register Successful : ' + data.message;
 				onSuccess();
 			} else {
 				const error = await response.json();
-				console.error('Login failed:', error);
-				errordis = 'Login failed: ' + error.message;
+				console.error('Register failed:', error);
+				errordis = 'Register failed: ' + error.message;
 			}
 		} catch (err) {
 			console.error('An error occurred during login: ', err);
@@ -53,7 +60,7 @@
 
 <Card.Root class="mx-auto w-full max-w-sm">
 	<Card.Header>
-		<Card.Title class="text-2xl">Login to MCPanel</Card.Title>
+		<Card.Title class="text-2xl">MCPanel Admin Setup</Card.Title>
 	</Card.Header>
 	<Card.Content>
 		<form onsubmit={handleSubmit}>
@@ -89,12 +96,32 @@
 					/>
 				</Field>
 				<Field>
+					<div class="flex items-center">
+						<FieldLabel for="confirm-password">Confirm Password</FieldLabel>
+					</div>
+					<Input
+						id="confirm-password"
+						name="confirmPassword"
+						type="password"
+						required
+						placeholder="Confirm Password"
+						bind:value={confirmPassword}
+					/>
+					{#if !passwordsMatch && confirmPassword !== ''}
+						<FieldDescription class="text-destructive">Passwords do not match</FieldDescription>
+					{/if}
+				</Field>
+				<Field>
 					<Button
 						type="submit"
 						class="w-full"
-						disabled={!isUsernameValid || username === '' || password === ''}
+						disabled={!isUsernameValid ||
+							username === '' ||
+							password === '' ||
+							!passwordsMatch ||
+							confirmPassword === ''}
 					>
-						Login
+						Register Admin User
 					</Button>
 				</Field>
 				<FieldError>{errordis}</FieldError>
