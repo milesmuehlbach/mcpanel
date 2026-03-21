@@ -314,8 +314,8 @@ async def _v1_auth_onboarding_post(
     if not username or len(username) > 32:
         raise HTTPException(400, "username must be 1-32 characters")
 
-    if len(password) < 12:
-        raise HTTPException(400, "password must be at least 12 characters")
+    if len(password) < 8:
+        raise HTTPException(400, "password must be at least 8 characters")
 
     password_hash = ph.hash(password)
 
