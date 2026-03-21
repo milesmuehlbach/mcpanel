@@ -389,10 +389,10 @@ class InstanceManager:
     def instance_root(self) -> pathlib.Path:
         return (self.base_path / "instances").resolve()
 
-    def list_instances(self) -> list[Instance]:
+    def get_instances(self) -> list[Instance]:
         return list(self.instances)
     
-    def list_instance_overviews(self) -> list[dict]:
+    def get_instance_overviews(self) -> list[dict]:
         return [instance.build_info() for instance in self.instances]
 
     def has_instance(self, instance_uuid: uuid.UUID | str) -> bool:
@@ -420,7 +420,7 @@ class InstanceManager:
             if replace:
                 self.instances = []
                 self._instances_by_uuid = {}
-            return self.list_instances()
+            return self.get_instances()
         if not instance_root.is_dir() or instance_root.is_symlink():
             raise ValueError(f"unexpected instances path: {instance_root}")
 
@@ -443,7 +443,7 @@ class InstanceManager:
             self._instances_by_uuid.update(scanned_instances)
 
         self.instances = list(self._instances_by_uuid.values())
-        return self.list_instances()
+        return self.get_instances()
 
     def create_instance(self, server_uid: str, java_uid: str, name: str | None = None, memory: int | None = None, arguments: list[str] | None = None) -> Instance:
         instance = Instance.create_instance(
