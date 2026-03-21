@@ -6,18 +6,44 @@
 		FieldGroup,
 		Field,
 		FieldLabel,
-		FieldDescription
+		FieldDescription,
+		FieldError
 	} from '$lib/components/ui/field/index.js';
 
-	const id = crypto.randomUUID();
-
 	let username = $state('');
+	let password = $state('');
+	let errordis = $state('');
 	const usernameRegex = /^[A-Za-z0-9_-]+$/;
 	let isUsernameValid = $derived(username === '' || usernameRegex.test(username));
 
-	function handleSubmit(e: SubmitEvent) {
+	async function handleSubmit(e: SubmitEvent) {
+		e.preventDefault();
+
 		if (!usernameRegex.test(username)) {
-			e.preventDefault();
+			console.error('Invalid username');
+			return;
+		}
+
+		try {
+			const response = await fetch('/api/v1/auth/login', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ username, password })
+			});
+
+			if (response.ok) {
+				const data = await response.json();
+				console.log('Login successful:', data);
+				errordis = 'Login Successful: ' + data.message;
+			} else {
+				const error = await response.json();
+				console.error('Login failed:', error);
+				errordis = 'Login failed:' + error.message;
+			}
+		} catch (err) {
+			console.error('An error occurred during login:', err);
 		}
 	}
 </script>
@@ -30,33 +56,45 @@
 		<form onsubmit={handleSubmit}>
 			<FieldGroup>
 				<Field>
-					<FieldLabel for="username-{id}">Username</FieldLabel>
+					<FieldLabel for="username">Username</FieldLabel>
 					<Input
-						id="username-{id}"
+						id="username"
+						name="username"
 						type="text"
 						placeholder="Username"
 						required
 						bind:value={username}
-						pattern="[a-z0-9_-]+"
-						oninput={(e) => (username = e.currentTarget.value)}
+						pattern="[A-Za-z0-9_-]+"
 					/>
 					{#if !isUsernameValid}
 						<FieldDescription class="text-destructive">
-							Username must only contain a-z, 0-9, _ and -
+							Username must only contain a-z, A-Z, 0-9, _ and -
 						</FieldDescription>
 					{/if}
 				</Field>
 				<Field>
 					<div class="flex items-center">
-						<FieldLabel for="password-{id}">Password</FieldLabel>
+						<FieldLabel for="password">Password</FieldLabel>
 					</div>
-					<Input id="password-{id}" type="password" required placeholder="Password" />
+					<Input
+						id="password"
+						name="password"
+						type="password"
+						required
+						placeholder="Password"
+						bind:value={password}
+					/>
 				</Field>
 				<Field>
-					<Button type="submit" class="w-full" disabled={!isUsernameValid || username === ''}>
+					<Button
+						type="submit"
+						class="w-full"
+						disabled={!isUsernameValid || username === '' || password === ''}
+					>
 						Login
 					</Button>
 				</Field>
+				<FieldError>{errordis}</FieldError>
 			</FieldGroup>
 		</form>
 	</Card.Content>
