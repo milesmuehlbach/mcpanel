@@ -3,6 +3,7 @@
 	import LoginView from '$lib/components/mainviews/login.svelte';
 	import OnboardingView from '$lib/components/mainviews/onboard.svelte';
 	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
 
 	type View = 'server' | 'login' | 'servercreation' | 'onboarding';
 
@@ -39,6 +40,7 @@
 		<LoginView
 			onSuccess={() => {
 				view = 'server';
+				toast.success("Login Successful!")
 			}}
 		/>
 	</div>
@@ -49,6 +51,7 @@
 		<OnboardingView
 			onSuccess={() => {
 				view = 'login';
+				toast.success("Registration Successful!")
 			}}
 		/>
 	</div>

@@ -67,7 +67,7 @@
 						placeholder="Username"
 						required
 						bind:value={username}
-						pattern="[A-Za-z0-9_-]+"
+						pattern="[-A-Za-z0-9_]+"
 					/>
 					{#if !isUsernameValid}
 						<FieldDescription class="text-destructive">
