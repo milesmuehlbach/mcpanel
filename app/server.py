@@ -30,7 +30,7 @@ async def http_exception_handler(request: Request, exception: Exception):
 app.include_router(api, prefix="/api")
 
 app.mount("/_app", StaticFiles(directory="build/_app"))
-# app.mount("/assets", StaticFiles(directory="build/assets")) // miles, 3/20/26, this was causing issues with python and you were locked in on the fort so I commented this out so I could test my ui.
+app.mount("/assets", StaticFiles(directory="build/assets"))
 
 @app.get("/")
 async def _root():
