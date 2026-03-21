@@ -36,14 +36,14 @@
 			if (response.ok) {
 				const data = await response.json();
 				console.log('Login successful:', data);
-				errordis = 'Login Successful: ' + data.message;
+				errordis = 'Login Successful : ' + data.message;
 			} else {
 				const error = await response.json();
 				console.error('Login failed:', error);
-				errordis = 'Login failed:' + error.message;
+				errordis = 'Login failed: ' + error.message;
 			}
 		} catch (err) {
-			console.error('An error occurred during login:', err);
+			console.error('An error occurred during login: ', err);
 		}
 	}
 </script>
