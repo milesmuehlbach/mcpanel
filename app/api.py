@@ -49,7 +49,7 @@ def init_db() -> None:
         db.execute(
             """
             CREATE TABLE IF NOT EXISTS settings (
-                key TEXT PRIMARY KEY,
+                key TEXT PRIMARY KEY NOT NULL,
                 value TEXT NOT NULL
             );
             """
@@ -61,6 +61,14 @@ def init_db() -> None:
                 username TEXT UNIQUE NOT NULL,
                 password_argon2 TEXT NOT NULL,
                 permissions TEXT NOT NULL
+            );
+            """
+        )
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS components (
+                uid TEXT PRIMARY KEY NOT NULL,
+                installed_at TIMESTAMP NOT NULL
             );
             """
         )
@@ -124,6 +132,40 @@ def has_permissions(uid: int, required_permission: str) -> bool:
         accepted_permissions.add(".".join(parts[:index]))
 
     return any(permission in accepted_permissions for permission in permissions)
+
+# hk i'm not sure about func names for update_component_database and remove_component_database
+def update_component_database(uid: str) -> None:
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT INTO components (uid, installed_at)
+            VALUES (?, ?)
+            ON CONFLICT(uid) DO UPDATE SET installed_at = excluded.installed_at
+            """,
+            (uid, datetime.now()),
+        )
+
+def remove_component_database(uid: str) -> None:
+    with get_db() as db:
+        db.execute(
+            "DELETE FROM components WHERE uid = ?",
+            (uid,),
+        )
+
+def get_installed_components() -> dict:
+    with get_db() as db:
+        rows = db.execute("SELECT uid, installed_at FROM components").fetchall()
+
+    return dict(rows)
+
+# TODO: maybe merge into one unified component installation func?
+def install_jre_component(uid: str, sha256: str, workdir: Path) -> None:
+    java.download_runtime(uid, sha256, workdir)
+    update_component_database(uid)
+
+def install_server_component(uid: str, hash: str | None, workdir: Path) -> None:
+    server.download_version(uid, hash, workdir)
+    update_component_database(uid)
 
 ########
 # INIT #
@@ -399,7 +441,7 @@ async def _v1_components_install(
                 raise HTTPException(400, "sha256 is required for jre installation")
 
             task_id = task_manager.enqueue(
-                java.download_runtime,
+                install_jre_component,
                 body.uid,
                 sha256,
                 get_workdir(),
@@ -419,7 +461,7 @@ async def _v1_components_install(
                     hash = None # setting it again here for clarity
 
             task_id = task_manager.enqueue(
-                server.download_version,
+                install_server_component,
                 body.uid,
                 hash,
                 get_workdir(),
