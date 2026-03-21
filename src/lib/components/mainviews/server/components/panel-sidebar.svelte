@@ -1,7 +1,7 @@
 <script lang="ts">
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import ServerSelector from '$lib/components/serverselection.svelte';
-	import SidebarFooter from '$lib/components/sidebarfooter.svelte';
+	import * as Sidebar from '$lib/components/ui/sidebar';
+	import ServerSelector from '$lib/components/mainviews/server/components/serverselection.svelte';
+	import SidebarFooter from '$lib/components/mainviews/server/components/sidebarfooter.svelte';
 </script>
 
 <Sidebar.Root collapsible="icon">

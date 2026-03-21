@@ -181,7 +181,7 @@ class AuthPermissionsInterface(BaseModel):
 async def _v1_auth_login(
     body: AuthCredentialsInterface
 ):
-    username = body.username
+    username = body.username.lower()
     password = body.password
 
     with get_db() as db:
@@ -218,7 +218,7 @@ async def _v1_auth_login(
 async def _v1_auth_register(
     body: AuthCredentialsInterface
 ):
-    username = body.username
+    username = body.username.lower()
     password = body.password
 
     username = username.strip()
