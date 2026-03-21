@@ -3,6 +3,7 @@ import json
 import pathlib
 import platform
 import psutil
+import re
 import shutil
 import subprocess
 import threading
@@ -38,6 +39,9 @@ DEFAULT_PARAMTERS = [
     "nogui"
 ]
 
+JAVA_COMPONENT_UID_PATTERN = re.compile(r"^jre:(?!.*\.{2})[a-z.]+:[a-z0-9]+$")
+SERVER_COMPONENT_UID_PATTERN = re.compile(r"^server:[a-z]+:(?!.*\.{2})[a-z0-9.-]+$")
+
 def _utcnow() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc)
 
@@ -55,8 +59,8 @@ def _to_epoch_seconds(value: datetime.datetime) -> int:
 class Instance:
     def __init__(self, uuid: uuid.UUID, base_path: pathlib.Path):
         self.uuid = uuid
-        self.base_path = base_path
-        self.path = base_path / "instances" / str(uuid)
+        self.base_path = base_path.resolve()
+        self.path = self.base_path / "instances" / str(uuid)
         self.json = self.path / "instance.json"
 
         self.set_defaults()
@@ -143,10 +147,11 @@ class Instance:
     
     @staticmethod
     def create_instance(base_path: pathlib.Path, server_uid: str, java_uid: str, name: str | None = None, memory: int | None = None, arguments: list[str] | None = None) -> Instance:
+        base_path = base_path.resolve()
         installed_components = get_installed_components()
-        if server_uid not in installed_components.keys():
+        if server_uid not in installed_components:
             raise ValueError(f"specified server component with uid '{server_uid}' is not installed")
-        if java_uid not in installed_components.keys():
+        if java_uid not in installed_components:
             raise ValueError(f"specified java component with uid '{java_uid}' is not installed")
         
         instance = Instance(uuid.uuid4(), base_path)
@@ -173,13 +178,36 @@ class Instance:
     
     @staticmethod
     def delete_instance(base_path: pathlib.Path, uuid: uuid.UUID):
-        pass # TODO: flippin nuke the instance folder
+        instance_root = (base_path / "instances").resolve()
+        instance_path = (instance_root / str(uuid)).resolve()
+
+        if instance_path.parent != instance_root:
+            raise ValueError(f"refusing to delete unexpected path: {instance_path}")
+        if not instance_path.exists():
+            raise FileNotFoundError(f"instance path does not exist: {instance_path}")
+        if not instance_path.is_dir() or instance_path.is_symlink():
+            raise ValueError(f"refusing to delete non-directory or symlink path: {instance_path}")
+
+        pending_delete_path = instance_root / f".deleting-{uuid}-{_to_epoch_seconds(_utcnow())}"
+        if pending_delete_path.exists():
+            raise FileExistsError(f"temporary deletion path already exists: {pending_delete_path}")
+
+        instance_path.rename(pending_delete_path)
+        try:
+            shutil.rmtree(pending_delete_path)
+        except Exception:
+            pending_delete_path.rename(instance_path)
+            raise
 
     def start(self):
         if self.running:
             raise RuntimeError(f"instance {self.uuid} is already running")
 
         java_executable = self._get_java_executable()
+        source_server_jar = self._get_server_jar()
+        instance_server_jar = (self.path / source_server_jar.name).resolve()
+        if not instance_server_jar.is_file():
+            raise FileNotFoundError(f"instance server jar not found at expected path: {instance_server_jar}")
 
         command = [
             str(java_executable),
@@ -187,17 +215,18 @@ class Instance:
             f"-Xms{self.memory}M",
             *self.arguments,
             "-jar",
-            str(self.jar),
+            str(instance_server_jar.name),
             *DEFAULT_PARAMTERS
         ]
 
         # TODO: automatically restart server on crash? make it a user option?
         self.process = subprocess.Popen(
             command,
-            cwd=self.path,
+            cwd=self.path.resolve(),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            # stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
             bufsize=1
         )
@@ -207,36 +236,59 @@ class Instance:
         self.bridge_thread.start()
 
     def stop(self):
+        # TODO: maybe move waiting logic to bridge thread?
+        # ideally the exposed API should be non-blocking
         if self.process and self.running:
             self.sendline("stop")
             self.process.wait()
             self.running = False
         
     def sendline(self, cmd):
-        if self.process and self.running:
+        if self.process and self.running and self.process.stdin:
             self.process.stdin.write(cmd + "\n")
             self.process.stdin.flush() 
         else:
             raise RuntimeError(f"instance {self.uuid} is not running")
     
     def _bridge_runner(self):
-        while self.running and self.process:
+        while self.running and self.process and self.process.stdout:
             lineout = self.process.stdout.readline()
             if not lineout:
                 break
             
-            print(f"[SERVER] [STDOUT] {lineout.strip()}")
+            print(f"[SERVER] {lineout.strip()}")
             
         self.running = False
 
     def _get_java_executable(self) -> pathlib.Path:
-        java_executable = pathlib.Path(self.base_path, *self.java.split(":"), "bin", "javaw.exe" if platform.system() == "Windows" else "java") # TODO: super vunerable! validate java uid, either here or higher up the chain
+        if not isinstance(self.java, str) or not JAVA_COMPONENT_UID_PATTERN.fullmatch(self.java):
+            raise ValueError(f"invalid java uid format: {self.java}")
+
+        java_parts = self.java.split(":")
+
+        java_executable = (self.base_path / pathlib.Path(*java_parts) / "bin" / ("java.exe" if platform.system() == "Windows" else "java")).resolve()
+        if self.base_path not in java_executable.parents:
+            raise ValueError(f"resolved java executable escaped base path: {java_executable}")
         if not java_executable.is_file():
             raise FileNotFoundError(f"java executable not found at expected path: {java_executable}")
         return java_executable
     
     def _get_server_jar(self) -> pathlib.Path:
-        server_jar = self.base_path / "jar" / self.jar # TODO: vunerable, validate jar name and path
+        if not isinstance(self.jar, str) or not self.jar.endswith(".jar"):
+            raise ValueError("server jar is not set")
+
+        server_uid = self.jar[:-4].replace("_", ":")
+        if not SERVER_COMPONENT_UID_PATTERN.fullmatch(server_uid):
+            raise ValueError(f"invalid server uid format: {server_uid}")
+
+        jar_name = f"{server_uid.replace(':', '_')}.jar"
+        if self.jar != jar_name:
+            raise ValueError(f"invalid server jar filename: {self.jar}")
+
+        jar_root = (self.base_path / "jar").resolve()
+        server_jar = (jar_root / jar_name).resolve()
+        if server_jar.parent != jar_root:
+            raise ValueError(f"resolved server jar escaped jar root: {server_jar}")
         if not server_jar.is_file():
             raise FileNotFoundError(f"server jar not found at expected path: {server_jar}")
         return server_jar
