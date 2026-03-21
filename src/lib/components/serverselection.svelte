@@ -4,9 +4,13 @@
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import GalleryVerticalEndIcon from '@lucide/svelte/icons/gallery-vertical-end';
-	let { servertitles, iconpath }: { servertitles: string[]; iconpath: string[] } = $props();
-	let currenttitle = $state(servertitles[0] ?? '');
-	let currenticon = $state(iconpath[0] ?? 'none');
+	let { servertitles = [], iconpath = [] }: { servertitles: string[]; iconpath: string[] } =
+		$props();
+
+	let selectedIndex = $state(0);
+
+	let displayTitle = $derived(servertitles[selectedIndex] ?? 'No Server Selected');
+	let displayIcon = $derived(iconpath[selectedIndex] ?? 'none');
 </script>
 
 <Sidebar.Menu>
@@ -22,24 +26,24 @@
 						<div
 							class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground"
 						>
-							{#if currenticon && currenticon !== 'none'}
-								<img src={currenticon} alt="Server Icon" class="h-5 w-5 rounded-sm object-cover" />
+							{#if displayIcon && displayIcon !== 'none'}
+								<img src={displayIcon} alt="Server Icon" class="h-5 w-5 rounded-sm object-cover" />
 							{:else}
 								<GalleryVerticalEndIcon class="h-5 w-5" />
 							{/if}
 						</div>
 						<div class="flex flex-col gap-0.5 leading-none">
-							<span class="font-semibold">{currenttitle}</span>
+							<span class="font-semibold">{displayTitle}</span>
 						</div>
 						<ChevronsUpDownIcon class="ms-auto" />
 					</Sidebar.MenuButton>
 				{/snippet}
 			</DropdownMenu.Trigger>
 			<DropdownMenu.Content class="w-(--bits-dropdown-menu-anchor-width)" align="start">
-				{#each servertitles as version (version)}
-					<DropdownMenu.Item onSelect={() => (currenttitle = version)}>
-						v{version}
-						{#if version === currenttitle}
+				{#each servertitles as version, i (version)}
+					<DropdownMenu.Item onSelect={() => (selectedIndex = i)}>
+						{version}
+						{#if i === selectedIndex}
 							<CheckIcon class="ms-auto" />
 						{/if}
 					</DropdownMenu.Item>

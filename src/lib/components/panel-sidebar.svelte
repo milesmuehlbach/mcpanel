@@ -1,12 +1,12 @@
 <script lang="ts">
-	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
+	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import ServerSelector from '$lib/components/serverselection.svelte';
 </script>
 
 <Sidebar.Root>
 	<Sidebar.Header>
-		<h1 class="font-extrabold text-2xl left-5">McPanel</h1>
-		<ServerSelector />
+		<h1 class="left-5 text-2xl font-extrabold">McPanel</h1>
+		<ServerSelector servertitles={['Server 1']} iconpath={['/favicon.png']} />
 	</Sidebar.Header>
 	<Sidebar.Content>
 		<Sidebar.Group />
