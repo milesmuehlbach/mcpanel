@@ -1,17 +1,18 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import ServerSelector from '$lib/components/serverselection.svelte';
-	import favicon from '$lib/assets/favicon.svg';
+	import SidebarFooter from '$lib/components/sidebarfooter.svelte';
 </script>
 
-<Sidebar.Root>
+<Sidebar.Root collapsible="icon">
 	<Sidebar.Header>
-		<h1 class="left-5 text-2xl font-extrabold">McPanel</h1>
-		<ServerSelector servertitles={['Server 1']} iconpath={[favicon]} />
+		<ServerSelector servertitles={['McPanel Test', 'TechnoDot Server']} iconpath={[]} />
 	</Sidebar.Header>
 	<Sidebar.Content>
 		<Sidebar.Group />
 		<Sidebar.Group />
 	</Sidebar.Content>
-	<Sidebar.Footer />
+	<Sidebar.Footer>
+		<SidebarFooter />
+	</Sidebar.Footer>
 </Sidebar.Root>

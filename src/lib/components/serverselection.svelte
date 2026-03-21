@@ -17,8 +17,18 @@
 
 	let selectedIndex = $state(0);
 
+	const getTitleFallback = (title: string) => {
+		const trimmed = title.trim();
+
+		if (!trimmed) return '??';
+
+		const initials = trimmed.slice(0, 2).toUpperCase();
+		return initials.length === 1 ? `${initials}?` : initials;
+	};
+
 	let activeTitle = $derived(servertitles[selectedIndex] ?? 'No Server');
 	let activeIcon = $derived(iconpath[selectedIndex] ?? '');
+	let activeTitleFallback = $derived(getTitleFallback(activeTitle));
 </script>
 
 <Sidebar.Menu>
@@ -37,7 +47,7 @@
 							{#if activeIcon}
 								<img src={activeIcon} alt={activeTitle} class="size-4" />
 							{:else}
-								<div class="size-4 rounded-sm bg-muted"></div>
+								<span class="text-xs leading-none font-bold">{activeTitleFallback}</span>
 							{/if}
 						</div>
 						<div class="grid flex-1 text-start text-sm leading-tight">
@@ -63,11 +73,12 @@
 							{#if iconpath[index]}
 								<img src={iconpath[index]} alt={title} class="size-3.5 shrink-0" />
 							{:else}
-								<div class="size-3.5 rounded-sm bg-muted"></div>
+								<span class="text-[10px] leading-none font-bold text-foreground">
+									{getTitleFallback(title)}
+								</span>
 							{/if}
 						</div>
 						{title}
-						<DropdownMenu.Shortcut>⌘{index + 1}</DropdownMenu.Shortcut>
 					</DropdownMenu.Item>
 				{/each}
 				<DropdownMenu.Separator />
