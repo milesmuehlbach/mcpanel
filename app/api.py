@@ -183,9 +183,9 @@ JWT_SECRET = get_setting("jwt_secret", secrets.token_urlsafe(32))
 instance_manager = InstanceManager()
 task_manager = TaskManager()
 
-def get_user_id(
+def get_auth_payload(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
-) -> int:
+) -> dict[str, object]:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(401, "missing or invalid authorization")
 
@@ -196,6 +196,15 @@ def get_user_id(
 
     uid = payload.get("id")
     if not isinstance(uid, int):
+        raise HTTPException(401, "invalid token payload")
+
+    return payload
+
+def get_user_id(
+    payload: dict[str, object] = Depends(get_auth_payload),
+) -> int:
+    uid = payload.get("id")
+    if isinstance(uid, bool) or not isinstance(uid, int):
         raise HTTPException(401, "invalid token payload")
 
     return uid
@@ -289,6 +298,37 @@ async def _v1_auth_register(
         raise HTTPException(409, "username already exists")
 
     return {"message": "registration successful"}
+
+@V1.get("/auth/me")
+async def _v1_auth_me(
+    payload: dict[str, object] = Depends(get_auth_payload),
+):
+    uid = payload.get("id")
+    exp = payload.get("exp")
+
+    if isinstance(uid, bool) or not isinstance(uid, int):
+        raise HTTPException(401, "invalid token payload")
+
+    with get_db() as db:
+        row = db.execute(
+            "SELECT username FROM users WHERE id = ?",
+            (uid,),
+        ).fetchone()
+
+    if row is None:
+        raise HTTPException(401, "invalid token payload")
+
+    expires_at = exp if isinstance(exp, int) else None
+
+    return {
+        "message": "token is valid",
+        "status": True,
+        "user": {
+            "id": uid,
+            "username": row[0]
+        },
+        "expires_at": expires_at,
+    }
 
 @V1.get("/auth/onboarding")
 async def _v1_auth_onboarding_get():
