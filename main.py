@@ -20,9 +20,8 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dev",
-        type=bool,
-        default=False,
-        help="run in development mode with hot reloading (default: False)",
+        action="store_true",
+        help="run in development mode with hot reloading",
     )
     args = parser.parse_args()
 
