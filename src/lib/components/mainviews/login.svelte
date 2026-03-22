@@ -39,6 +39,7 @@
 				const data = await response.json();
 				console.log('Login successful:', data);
 				errordis = 'Login Successful : ' + data.message;
+				localStorage.setItem('token', data.token)
 				onSuccess();
 			} else {
 				const error = await response.json();
