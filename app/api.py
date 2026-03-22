@@ -13,7 +13,7 @@ import sqlite3
 from typing import Annotated
 
 from app.downloaders import java, server
-from app.instances import InstanceManager
+# from app.instances import InstanceManager
 from app.tasks import TaskManager
 
 WORKING_PATH_ENV = "MCPANEL_PATH"
@@ -180,7 +180,7 @@ bearer = HTTPBearer(auto_error=False)
 init_db()
 JWT_SECRET = get_setting("jwt_secret", secrets.token_urlsafe(32))
 # TODO: ts InstanceManager and TaskManager only work bc we're currently running only ONE FastAPI worker process! scaling to multiple workers fails, ts may need to be db-based in ts (near? far? who tf knows) future
-instance_manager = InstanceManager()
+# instance_manager = InstanceManager()
 task_manager = TaskManager()
 
 def get_auth_payload(
@@ -544,42 +544,44 @@ async def _v1_tasks_status(
 # INSTANCE ENDPOINTS #
 ######################
 
-class InstanceInterface(BaseModel):
-    uuid: str
+# TODO: refactor components and db stuff into their own module, so get_installed_components, etc. don't trigger circular import errors -@technodot
 
-class OptionalInstanceInterface(BaseModel):
-    uuid: str | None = None
+# class InstanceInterface(BaseModel):
+#     uuid: str
 
-@V1.get(
-    "/instances/list",
-    dependencies=[Depends(require_permission("instances.list_instances"))]
-)
-async def _v1_instances_list():
-    return {"message": "success", "instances": [instance.build_info() for instance in instance_manager.list_instances()]}
+# class OptionalInstanceInterface(BaseModel):
+#     uuid: str | None = None
 
-@V1.post(
-    "/instances/check",
-    dependencies=[Depends(require_permission("instances.list_instances"))]
-)
-async def _v1_instances_check(
-    body: InstanceInterface
-):
-    if instance_manager.has_instance(body.uuid):
-        return {"message": "success", "status": True}
-    return {"message": "success", "status": False}
+# @V1.get(
+#     "/instances/list",
+#     dependencies=[Depends(require_permission("instances.list_instances"))]
+# )
+# async def _v1_instances_list():
+#     return {"message": "success", "instances": [instance.build_info() for instance in instance_manager.list_instances()]}
 
-@V1.post(
-    "/instances/reload",
-    dependencies=[Depends(require_permission("instances.create_instance"))] # TODO: maybe a seperate instances.manage_instances permission is more ideal? figure ts out ltr
-)
-async def _v1_instances_reload(
-    body: OptionalInstanceInterface
-):
-    if body.uuid is None:
-        instance_manager.scan_instances()
-        return {"message": "success"}
-    else:
-        instance_manager.reload_instance(body.uuid)
-        return {"message": "success"}
+# @V1.post(
+#     "/instances/check",
+#     dependencies=[Depends(require_permission("instances.list_instances"))]
+# )
+# async def _v1_instances_check(
+#     body: InstanceInterface
+# ):
+#     if instance_manager.has_instance(body.uuid):
+#         return {"message": "success", "status": True}
+#     return {"message": "success", "status": False}
+
+# @V1.post(
+#     "/instances/reload",
+#     dependencies=[Depends(require_permission("instances.create_instance"))] # TODO: maybe a seperate instances.manage_instances permission is more ideal? figure ts out ltr
+# )
+# async def _v1_instances_reload(
+#     body: OptionalInstanceInterface
+# ):
+#     if body.uuid is None:
+#         instance_manager.scan_instances()
+#         return {"message": "success"}
+#     else:
+#         instance_manager.reload_instance(body.uuid)
+#         return {"message": "success"}
 
 api.include_router(V1)
