@@ -5,7 +5,12 @@
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 
 	const sidebar = Sidebar.useSidebar();
-
+	const clamp = (value, min = 0, max = 1) => Math.min(Math.max(value, min), max);
+	const lerp = (from, to, progress) => from + (to - from) * progress;
+	let collapseProgress = $derived(clamp(sidebar.progress));
+	let logoutButtonStyle = $derived(
+		`gap: ${lerp(0.25, 0, collapseProgress).toFixed(4)}rem; padding-inline: ${lerp(0.625, 0.5, collapseProgress).toFixed(4)}rem; will-change: gap, padding;`
+	);
 
 	async function handleLogout() {
 		const token = sessionStorage.getItem('token');
@@ -18,18 +23,16 @@
 		window.location.reload();
 		return;
 	}
-
 </script>
 
 <Button
-	variant={sidebar.state === 'expanded' ? 'outline' : 'ghost'}
+	variant={collapseProgress > 0.9 ? 'ghost' : 'outline'}
 	size="sm"
-	class={sidebar.state === 'collapsed' ? 'px-2' : ''}
+	class="overflow-hidden"
+	style={logoutButtonStyle}
 	onclick={handleLogout}
 >
-	{#if sidebar.state === 'expanded'}
-		Log Out
-	{/if}
+	<span data-sidebar="label" class="whitespace-nowrap">Log Out</span>
 	<LogOutIcon />
 </Button>
 <Separator />

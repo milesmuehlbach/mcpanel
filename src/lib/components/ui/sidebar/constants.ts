@@ -1,6 +1,11 @@
-export const SIDEBAR_COOKIE_NAME = "sidebar:state";
+export const SIDEBAR_COOKIE_NAME = 'sidebar:state';
 export const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-export const SIDEBAR_WIDTH = "16rem";
-export const SIDEBAR_WIDTH_MOBILE = "18rem";
-export const SIDEBAR_WIDTH_ICON = "3rem";
-export const SIDEBAR_KEYBOARD_SHORTCUT = "b";
+export const SIDEBAR_WIDTH_REM = 16;
+export const SIDEBAR_WIDTH_MOBILE_REM = 18;
+export const SIDEBAR_WIDTH_ICON_REM = 3;
+export const SIDEBAR_WIDTH = `${SIDEBAR_WIDTH_REM}rem`;
+export const SIDEBAR_WIDTH_MOBILE = `${SIDEBAR_WIDTH_MOBILE_REM}rem`;
+export const SIDEBAR_WIDTH_ICON = `${SIDEBAR_WIDTH_ICON_REM}rem`;
+export const SIDEBAR_COLLAPSE_DURATION = 160;
+export const SIDEBAR_EXPAND_DURATION = 220;
+export const SIDEBAR_KEYBOARD_SHORTCUT = 'b';
