@@ -5,12 +5,27 @@
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 
 	const sidebar = Sidebar.useSidebar();
+
+
+	async function handleLogout() {
+		const token = sessionStorage.getItem('token');
+		if (!token) {
+			console.error('No token found, cannot log out.');
+			window.location.reload();
+			return;
+		}
+		sessionStorage.removeItem('token');
+		window.location.reload();
+		return;
+	}
+
 </script>
 
 <Button
 	variant={sidebar.state === 'expanded' ? 'outline' : 'ghost'}
 	size="sm"
 	class={sidebar.state === 'collapsed' ? 'px-2' : ''}
+	onclick={handleLogout}
 >
 	{#if sidebar.state === 'expanded'}
 		Log Out

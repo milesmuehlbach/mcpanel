@@ -7,10 +7,12 @@
 
 	let {
 		servertitles = [],
-		iconpath = []
+		iconpath = [],
+		newServer = () => {}
 	}: {
 		servertitles: string[];
 		iconpath: string[];
+		newServer?: () => void;
 	} = $props();
 
 	const sidebar = useSidebar();
@@ -82,11 +84,11 @@
 					</DropdownMenu.Item>
 				{/each}
 				<DropdownMenu.Separator />
-				<DropdownMenu.Item class="gap-2 p-2">
+				<DropdownMenu.Item onSelect={newServer} class="gap-2 p-2">
 					<div class="flex size-6 items-center justify-center rounded-md border bg-transparent">
 						<PlusIcon class="size-4" />
 					</div>
-					<div class="font-medium text-muted-foreground">Add server</div>
+					<div class="font-medium text-muted-foreground">New server</div>
 				</DropdownMenu.Item>
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>

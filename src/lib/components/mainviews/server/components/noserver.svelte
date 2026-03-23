@@ -1,8 +1,10 @@
 <script lang="ts">
-	import * as Empty from "$lib/components/ui/empty";
-	import { Button } from "$lib/components/ui/button";
-	import PlusIcon from "@lucide/svelte/icons/plus";
-	import ServerIcon from "@lucide/svelte/icons/server";
+	import * as Empty from '$lib/components/ui/empty';
+	import { Button } from '$lib/components/ui/button';
+	import PlusIcon from '@lucide/svelte/icons/plus';
+	import ServerIcon from '@lucide/svelte/icons/server';
+
+	let { newServer = () => {} }: { newServer?: () => void } = $props();
 </script>
 
 <Empty.Root>
@@ -17,7 +19,9 @@
 	</Empty.Header>
 	<Empty.Content>
 		<div class="flex gap-2">
-			<Button class="text-white">Create New Server <PlusIcon class="inline" /></Button>
+			<Button class="text-white" onclick={newServer}
+				>Create New Server <PlusIcon class="inline" /></Button
+			>
 		</div>
 	</Empty.Content>
 </Empty.Root>
