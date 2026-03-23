@@ -2,6 +2,7 @@
 	import ServerView from '$lib/components/mainviews/server/serverview.svelte';
 	import LoginView from '$lib/components/mainviews/login.svelte';
 	import OnboardingView from '$lib/components/mainviews/onboard.svelte';
+	import ServerCreationView from '$lib/components/mainviews/creation/servercreation.svelte';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
@@ -109,7 +110,7 @@
 		/>
 	</div>
 {:else if view === 'servercreation'}
-	<h1>Server Creation Placeholder</h1>
+	<ServerCreationView />
 {:else if view === 'onboarding'}
 	<div class="flex h-screen w-full items-center justify-center px-4">
 		<OnboardingView
