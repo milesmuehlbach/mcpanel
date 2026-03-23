@@ -16,6 +16,8 @@
 	} = $props();
 
 	const sidebar = useSidebar();
+	const clamp = (value: number, min = 0, max = 1) => Math.min(Math.max(value, min), max);
+	const lerp = (from: number, to: number, progress: number) => from + (to - from) * progress;
 
 	let selectedIndex = $state(0);
 
@@ -31,6 +33,10 @@
 	let activeTitle = $derived(servertitles[selectedIndex] ?? 'No Server');
 	let activeIcon = $derived(iconpath[selectedIndex] ?? '');
 	let activeTitleFallback = $derived(getTitleFallback(activeTitle));
+	let collapseProgress = $derived(clamp(sidebar.progress));
+	let triggerShellStyle = $derived(
+		`width: calc(${(1 - collapseProgress).toFixed(4)} * 100% + ${collapseProgress.toFixed(4)} * 2rem) !important; height: ${lerp(3, 2, collapseProgress).toFixed(4)}rem !important; gap: ${lerp(0.5, 0, collapseProgress).toFixed(4)}rem; padding: ${lerp(0.5, 0, collapseProgress).toFixed(4)}rem ${lerp(0.625, 0, collapseProgress).toFixed(4)}rem !important; will-change: width, height, gap, padding;`
+	);
 </script>
 
 <Sidebar.Menu>
@@ -41,10 +47,11 @@
 					<Sidebar.MenuButton
 						{...props}
 						size="lg"
-						class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+						style={triggerShellStyle}
+						class={`data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground ${collapseProgress > 0.92 ? 'hover:bg-transparent data-[state=open]:bg-transparent' : ''}`}
 					>
 						<div
-							class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground"
+							class="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground"
 						>
 							{#if activeIcon}
 								<img src={activeIcon} alt={activeTitle} class="size-4" />
@@ -52,13 +59,21 @@
 								<span class="text-xs leading-none font-bold">{activeTitleFallback}</span>
 							{/if}
 						</div>
-						<div class="grid flex-1 text-start text-sm leading-tight">
+						<div
+							data-sidebar="label-stack"
+							class="grid min-w-0 flex-1 text-start text-sm leading-tight"
+						>
 							<span class="truncate font-medium">
 								{activeTitle}
 							</span>
 							<span class="truncate text-xs">Minecraft Server</span>
 						</div>
-						<ChevronsUpDownIcon class="ms-auto" />
+						<span
+							data-sidebar="secondary"
+							class="ms-auto flex shrink-0 items-center justify-center"
+						>
+							<ChevronsUpDownIcon class="shrink-0" />
+						</span>
 					</Sidebar.MenuButton>
 				{/snippet}
 			</DropdownMenu.Trigger>

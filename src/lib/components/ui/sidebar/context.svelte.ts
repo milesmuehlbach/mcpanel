@@ -1,6 +1,12 @@
-import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
-import { getContext, setContext } from "svelte";
-import { SIDEBAR_KEYBOARD_SHORTCUT } from "./constants.js";
+import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
+import { quintOut } from 'svelte/easing';
+import { Tween, prefersReducedMotion } from 'svelte/motion';
+import { getContext, setContext } from 'svelte';
+import {
+	SIDEBAR_COLLAPSE_DURATION,
+	SIDEBAR_EXPAND_DURATION,
+	SIDEBAR_KEYBOARD_SHORTCUT
+} from './constants.js';
 
 type Getter<T> = () => T;
 
@@ -24,20 +30,35 @@ class SidebarState {
 	readonly props: SidebarStateProps;
 	open = $derived.by(() => this.props.open());
 	openMobile = $state(false);
-	setOpen: SidebarStateProps["setOpen"];
+	setOpen: SidebarStateProps['setOpen'];
 	#isMobile: IsMobile;
-	state = $derived.by(() => (this.open ? "expanded" : "collapsed"));
+	#progress: Tween<0 | 1>;
+	state = $derived.by(() => (this.open ? 'expanded' : 'collapsed'));
 
 	constructor(props: SidebarStateProps) {
 		this.setOpen = props.setOpen;
 		this.#isMobile = new IsMobile();
 		this.props = props;
+		this.#progress = Tween.of(() => (this.open ? 0 : 1), {
+			duration: (from, to) => {
+				if (prefersReducedMotion.current) {
+					return 0;
+				}
+
+				return to > from ? SIDEBAR_COLLAPSE_DURATION : SIDEBAR_EXPAND_DURATION;
+			},
+			easing: quintOut
+		});
 	}
 
 	// Convenience getter for checking if the sidebar is mobile
 	// without this, we would need to use `sidebar.isMobile.current` everywhere
 	get isMobile() {
 		return this.#isMobile.current;
+	}
+
+	get progress() {
+		return this.#progress.current;
 	}
 
 	// Event handler to apply to the `<svelte:window>`
@@ -53,13 +74,11 @@ class SidebarState {
 	};
 
 	toggle = () => {
-		return this.#isMobile.current
-			? (this.openMobile = !this.openMobile)
-			: this.setOpen(!this.open);
+		return this.#isMobile.current ? (this.openMobile = !this.openMobile) : this.setOpen(!this.open);
 	};
 }
 
-const SYMBOL_KEY = "scn-sidebar";
+const SYMBOL_KEY = 'scn-sidebar';
 
 /**
  * Instantiates a new `SidebarState` instance and sets it in the context.

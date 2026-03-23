@@ -2,9 +2,9 @@
 
 @import 'tw-animate-css';
 
-@import "tw-animate-css";
+@import 'tw-animate-css';
 
-@import "@fontsource-variable/dm-sans";
+@import '@fontsource-variable/dm-sans';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -97,6 +97,70 @@
 	}
 }
 
+[data-slot='sidebar'] {
+	--sidebar-progress: 0;
+	--sidebar-progress-inverse: 1;
+	--sidebar-button-gap: 0.5rem;
+	--sidebar-button-padding: 0.625rem;
+	--sidebar-label-width: 12rem;
+	--sidebar-label-opacity: 1;
+	--sidebar-label-shift: 0rem;
+	--sidebar-label-scale: 1;
+	--sidebar-secondary-opacity: 1;
+	--sidebar-secondary-shift: 0rem;
+	--sidebar-submenu-height: 24rem;
+}
+
+[data-slot='sidebar'] [data-sidebar='menu-button'] > span:last-child,
+[data-slot='sidebar'] [data-sidebar='menu-sub-button'] > span:last-child {
+	display: block;
+}
+
+[data-slot='sidebar'] [data-sidebar='menu-button'] > span:last-child,
+[data-slot='sidebar'] [data-sidebar='menu-sub-button'] > span:last-child,
+[data-slot='sidebar'] [data-sidebar='group-label'],
+[data-slot='sidebar'] [data-sidebar='label'],
+[data-slot='sidebar'] [data-sidebar='label-stack'] {
+	min-width: 0;
+	max-width: var(--sidebar-label-width);
+	overflow: hidden;
+	opacity: var(--sidebar-label-opacity);
+	transform: translate3d(var(--sidebar-label-shift), 0, 0) scale(var(--sidebar-label-scale));
+	transform-origin: left center;
+	will-change: opacity, transform, max-width;
+}
+
+[data-slot='sidebar'] [data-sidebar='label-stack'] {
+	flex: 0 1 auto;
+}
+
+[data-slot='sidebar'] [data-sidebar='secondary'],
+[data-slot='sidebar'] [data-sidebar='menu-action'],
+[data-slot='sidebar'] [data-sidebar='group-action'],
+[data-slot='sidebar'] [data-sidebar='menu-badge'] {
+	opacity: var(--sidebar-secondary-opacity);
+	transform: translate3d(var(--sidebar-secondary-shift), 0, 0);
+	transform-origin: right center;
+	will-change: opacity, transform;
+}
+
+[data-slot='sidebar'] [data-sidebar='menu-sub'] {
+	max-height: var(--sidebar-submenu-height);
+	overflow: hidden;
+	opacity: var(--sidebar-secondary-opacity);
+	transform: translate3d(var(--sidebar-secondary-shift), 0, 0);
+	transform-origin: top left;
+	will-change: opacity, transform, max-height;
+}
+
+[data-slot='sidebar'][data-state='collapsed'] [data-sidebar='secondary'],
+[data-slot='sidebar'][data-state='collapsed'] [data-sidebar='menu-action'],
+[data-slot='sidebar'][data-state='collapsed'] [data-sidebar='group-action'],
+[data-slot='sidebar'][data-state='collapsed'] [data-sidebar='menu-badge'],
+[data-slot='sidebar'][data-state='collapsed'] [data-sidebar='menu-sub'] {
+	pointer-events: none;
+}
+
 .dark {
 	--background: oklch(0.147 0.004 49.25);
 	--foreground: oklch(0.985 0.001 106.423);
@@ -132,25 +196,29 @@
 }
 
 @custom-variant data-open {
-	&:where([data-state="open"]), &:where([data-open]:not([data-open="false"])) {
+	&:where([data-state='open']),
+	&:where([data-open]:not([data-open='false'])) {
 		@slot;
 	}
 }
 
 @custom-variant data-closed {
-	&:where([data-state="closed"]), &:where([data-closed]:not([data-closed="false"])) {
+	&:where([data-state='closed']),
+	&:where([data-closed]:not([data-closed='false'])) {
 		@slot;
 	}
 }
 
 @custom-variant data-checked {
-	&:where([data-state="checked"]), &:where([data-checked]:not([data-checked="false"])) {
+	&:where([data-state='checked']),
+	&:where([data-checked]:not([data-checked='false'])) {
 		@slot;
 	}
 }
 
 @custom-variant data-unchecked {
-	&:where([data-state="unchecked"]), &:where([data-unchecked]:not([data-unchecked="false"])) {
+	&:where([data-state='unchecked']),
+	&:where([data-unchecked]:not([data-unchecked='false'])) {
 		@slot;
 	}
 }
@@ -162,25 +230,27 @@
 }
 
 @custom-variant data-disabled {
-	&:where([data-disabled="true"]), &:where([data-disabled]:not([data-disabled="false"])) {
+	&:where([data-disabled='true']),
+	&:where([data-disabled]:not([data-disabled='false'])) {
 		@slot;
 	}
 }
 
 @custom-variant data-active {
-	&:where([data-state="active"]), &:where([data-active]:not([data-active="false"])) {
+	&:where([data-state='active']),
+	&:where([data-active]:not([data-active='false'])) {
 		@slot;
 	}
 }
 
 @custom-variant data-horizontal {
-	&:where([data-orientation="horizontal"]) {
+	&:where([data-orientation='horizontal']) {
 		@slot;
 	}
 }
 
 @custom-variant data-vertical {
-	&:where([data-orientation="vertical"]) {
+	&:where([data-orientation='vertical']) {
 		@slot;
 	}
 }
