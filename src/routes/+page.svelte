@@ -8,13 +8,40 @@
 
 	type View = 'server' | 'login' | 'servercreation' | 'onboarding';
 
+	const VALID_VIEWS: View[] = ['server', 'login', 'servercreation', 'onboarding'];
+
+	let initialized = $state(false);
 	let view = $state<View>('login');
 
 	let isDirty = $derived(view === 'servercreation');
 
+	function getViewFromUrl(): View {
+		const url = new URL(window.location.href);
+		const urlView = url.searchParams.get('view');
+
+		if (urlView && VALID_VIEWS.includes(urlView as View)) {
+			return urlView as View;
+		}
+
+		return 'login';
+	}
+
+	function setView(newView: View, replaceState = true) {
+		view = newView;
+		const url = new URL(window.location.href);
+		url.searchParams.set('view', newView);
+
+		const target = `${url.pathname}${url.search}${url.hash}`;
+		if (replaceState) {
+			window.history.replaceState(window.history.state, '', target);
+			return;
+		}
+
+		window.history.pushState(window.history.state, '', target);
+	}
+
 	function newServer() {
-		view = 'servercreation';
-		return;
+		setView('servercreation');
 	}
 
 	function getStoredToken(): string | null {
@@ -67,26 +94,39 @@
 	}
 
 	onMount(() => {
+		view = getViewFromUrl();
+
+		const onPopState = () => {
+			view = getViewFromUrl();
+		};
+
+		window.addEventListener('popstate', onPopState);
+
 		void (async () => {
 			const allowed = await isOnboardingAllowed();
-			view = allowed ? 'onboarding' : 'login';
-
 			if (allowed) {
+				setView('onboarding');
+				initialized = true;
 				return;
 			}
 
 			const hadToken = !!getStoredToken();
 			const expired = await isTokenExpired();
 			if (!expired) {
-				view = 'server';
+				setView('server');
 			} else {
 				if (hadToken) {
 					toast.error('Session Expired. Please log in again.');
 				}
 				clearStoredToken();
-				view = 'login';
+				setView('login');
 			}
+			initialized = true;
 		})();
+
+		return () => {
+			window.removeEventListener('popstate', onPopState);
+		};
 	});
 </script>
 
@@ -98,13 +138,15 @@
 	}}
 />
 
-{#if view === 'server'}
+{#if !initialized}
+	<div class="flex h-screen w-full items-center justify-center px-4"></div>
+{:else if view === 'server'}
 	<ServerView {newServer} />
 {:else if view === 'login'}
 	<div class="flex h-screen w-full items-center justify-center px-4">
 		<LoginView
 			onSuccess={() => {
-				view = 'server';
+				setView('server', false);
 				toast.success('Login Successful!');
 			}}
 		/>
@@ -115,7 +157,7 @@
 	<div class="flex h-screen w-full items-center justify-center px-4">
 		<OnboardingView
 			onSuccess={() => {
-				view = 'login';
+				setView('login');
 				toast.success('Registration Successful!');
 			}}
 		/>
