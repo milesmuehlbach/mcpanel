@@ -9,6 +9,7 @@
 	const clamp = (value: number, min = 0, max = 1) => Math.min(Math.max(value, min), max);
 	const lerp = (from: number, to: number, progress: number) => from + (to - from) * progress;
 	let collapseProgress = $derived(clamp(sidebar.progress));
+	let isCollapsed = $derived(collapseProgress > 0.9);
 	let logoutButtonStyle = $derived(
 		`gap: ${lerp(0.25, 0, collapseProgress).toFixed(4)}rem; padding-inline: ${lerp(0.625, 0.5, collapseProgress).toFixed(4)}rem; will-change: gap, padding;`
 	);
@@ -30,5 +31,10 @@
 	<LogOutIcon />
 </Button>
 <Separator />
-<Sidebar.Trigger class="size-8 shrink-0 bg-transparent" />
-<User class="size-8 ml-auto"/>
+
+<div
+	class={`flex w-full ${isCollapsed ? 'flex-col-reverse items-center gap-2' : 'items-center justify-between gap-2'}`}
+>
+	<Sidebar.Trigger class="size-8 shrink-0 bg-transparent" />
+	<User class="size-8" />
+</div>

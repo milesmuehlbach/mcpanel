@@ -3,7 +3,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import { onMount } from 'svelte';
 
-	let { username = 'User' }: { username?: string } = $props();
+	let { username = 'User', class: className }: { username?: string; class?: string } = $props();
 	let displayName = $state('User');
 
 	function getInitial(name: string): string {
@@ -53,7 +53,7 @@
 
 <DropdownMenu.Root>
 	<DropdownMenu.Trigger>
-		<Avatar.Root>
+		<Avatar.Root class={className}>
 			<Avatar.Fallback>{getInitial(displayName)}</Avatar.Fallback>
 		</Avatar.Root>
 	</DropdownMenu.Trigger>

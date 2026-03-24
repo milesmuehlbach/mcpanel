@@ -11,11 +11,11 @@
 	import Settings2 from '@lucide/svelte/icons/settings-2';
 	import ServerCog from '@lucide/svelte/icons/server-cog';
 	import Users from '@lucide/svelte/icons/users';
-	import SquareTerminal from '@lucide/svelte/icons/square-terminal'
+	import SquareTerminal from '@lucide/svelte/icons/square-terminal';
 	import ScrollText from '@lucide/svelte/icons/scroll-text';
 	import Download from '@lucide/svelte/icons/download';
 	import Server from '@lucide/svelte/icons/server';
-	import Folders from '@lucide/svelte/icons/folders'
+	import Folders from '@lucide/svelte/icons/folders';
 
 	interface SidebarNavItem {
 		name: string;
@@ -63,7 +63,7 @@
 		{ name: 'Properties', icon: Settings2 },
 		{ name: 'Mods', icon: Download },
 		{ name: 'Console', icon: SquareTerminal },
-		{ name: 'Server', icon: Server},
+		{ name: 'Server', icon: Server },
 		{ name: 'Files', icon: Folders },
 		{ name: 'Logs', icon: ScrollText }
 	];
@@ -83,14 +83,14 @@
 			{/each}
 		</Sidebar.Menu>
 		<Sidebar.Group />
-		<Sidebar.Group class="mt-auto align-left">
+		<div class="mt-auto">
 			<Sidebar.Menu>
 				{#if isAdminUser}
 					<SidebarItem name="MCPanel Settings" icon={ServerCog} />
 					<SidebarItem name="User Management" icon={Users} />
 				{/if}
 			</Sidebar.Menu>
-		</Sidebar.Group>
+		</div>
 	</Sidebar.Content>
 	<Sidebar.Footer>
 		<SidebarFooter />
