@@ -9,6 +9,13 @@
 	import type { IconProps } from '@lucide/svelte';
 	import Gauge from '@lucide/svelte/icons/gauge';
 	import Settings2 from '@lucide/svelte/icons/settings-2';
+	import ServerCog from '@lucide/svelte/icons/server-cog';
+	import Users from '@lucide/svelte/icons/users';
+	import SquareTerminal from '@lucide/svelte/icons/square-terminal'
+	import ScrollText from '@lucide/svelte/icons/scroll-text';
+	import Download from '@lucide/svelte/icons/download';
+	import Server from '@lucide/svelte/icons/server';
+	import Folders from '@lucide/svelte/icons/folders'
 
 	interface SidebarNavItem {
 		name: string;
@@ -53,7 +60,12 @@
 
 	const serverMenuItems: SidebarNavItem[] = [
 		{ name: 'Dashboard', icon: Gauge },
-		{ name: 'Properties', icon: Settings2 }
+		{ name: 'Properties', icon: Settings2 },
+		{ name: 'Mods', icon: Download },
+		{ name: 'Console', icon: SquareTerminal },
+		{ name: 'Server', icon: Server},
+		{ name: 'Files', icon: Folders },
+		{ name: 'Logs', icon: ScrollText }
 	];
 
 	let { newServer = () => {} }: { newServer?: () => void } = $props();
@@ -69,12 +81,16 @@
 			{#each serverMenuItems as item (item.name)}
 				<SidebarItem name={item.name} icon={item.icon} />
 			{/each}
-			{#if isAdminUser}
-				<Separator class="m-0.5"/>
-				<SidebarItem name="Admin" icon={Settings2} />
-			{/if}
 		</Sidebar.Menu>
 		<Sidebar.Group />
+		<Sidebar.Group class="mt-auto align-left">
+			<Sidebar.Menu>
+				{#if isAdminUser}
+					<SidebarItem name="MCPanel Settings" icon={ServerCog} />
+					<SidebarItem name="User Management" icon={Users} />
+				{/if}
+			</Sidebar.Menu>
+		</Sidebar.Group>
 	</Sidebar.Content>
 	<Sidebar.Footer>
 		<SidebarFooter />
