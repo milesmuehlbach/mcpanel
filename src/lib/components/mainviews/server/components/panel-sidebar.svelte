@@ -77,13 +77,11 @@
 	</Sidebar.Header>
     <Separator />
 	<Sidebar.Content>
-		<Sidebar.Group />
-		<Sidebar.Menu>
+        <Sidebar.Menu class="mt-2">
 			{#each serverMenuItems as item (item.name)}
 				<SidebarItem name={item.name} icon={item.icon} />
 			{/each}
 		</Sidebar.Menu>
-		<Sidebar.Group />
 		<div class="mt-auto">
 			<Sidebar.Menu>
 				{#if isAdminUser}
