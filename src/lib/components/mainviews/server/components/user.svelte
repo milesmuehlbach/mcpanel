@@ -1,6 +1,10 @@
 <script lang="ts">
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
 	import { onMount } from 'svelte';
 
 	let { username = 'User', class: className }: { username?: string; class?: string } = $props();
@@ -61,7 +65,39 @@
 		<DropdownMenu.Group>
 			<DropdownMenu.Label>Hello, {displayName}.</DropdownMenu.Label>
 			<DropdownMenu.Separator />
-			<DropdownMenu.Item>Reset Password</DropdownMenu.Item>
+			<Dialog.Root>
+				<form action="/api/v1/auth/reset-password">
+				<Dialog.Trigger><DropdownMenu.Item>Reset Password</DropdownMenu.Item></Dialog.Trigger>
+				<Dialog.Content class="m:max-w-[425px]">
+					<Dialog.Header>
+						<Dialog.Title>Reset Password</Dialog.Title>
+						<Dialog.Description>
+							Please enter your current password and a new password.
+						</Dialog.Description>
+					</Dialog.Header>
+					<div class="grid gap-4">
+						<div class="grid gap-3">
+							<Label for="currentpassword">Current Password</Label>
+							<Input id="currentpassword" name="currentpassword" defaultValue="••••••••" />
+						</div>
+						<div class="grid gap-3">
+							<Label for="newpassword">Username</Label>
+							<Input id="newpassword" name="newpassword" defaultValue="••••••••" />
+						</div>
+						<div class="grid gap-3">
+							<Label for="pwconfirm">Confirm New Password</Label>
+							<Input id="pwconfirm" name="pwconfirm" defaultValue="••••••••" />
+						</div>
+					</div>
+					<Dialog.Footer>
+						<Dialog.Close type="button" class={buttonVariants({ variant: "outline" })}>
+							Cancel
+						</Dialog.Close>
+						<Button type="submit">Reset Password</Button>
+					</Dialog.Footer>
+				</Dialog.Content>
+				</form>
+			</Dialog.Root>
 			<DropdownMenu.Item onclick={handleLogout}>Logout</DropdownMenu.Item>
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>

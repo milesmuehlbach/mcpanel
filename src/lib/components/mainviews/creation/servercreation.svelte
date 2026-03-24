@@ -2,7 +2,6 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import { Progress } from '$lib/components/ui/progress';
-	import Step1 from '$lib/components/mainviews/creation/steps/step1.svelte';
 
 	const totalSteps = 3;
 	let step = $state(1);
@@ -33,7 +32,7 @@
 
 		<Card.Content class="min-h-56 py-6">
 			{#if step === 1}
-				<Step1 {incrementStep} />
+				<h1>step 1</h1>
 			{:else if step === 2}
 				<div class="space-y-2">
 					<h2 class="text-xl font-semibold">Server Configuration</h2>
