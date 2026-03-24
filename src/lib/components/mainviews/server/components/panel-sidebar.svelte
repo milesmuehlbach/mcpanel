@@ -75,6 +75,7 @@
 	<Sidebar.Header>
 		<ServerSelector servertitles={['McPanel Test', 'TechnoDot Server']} iconpath={[]} {newServer} />
 	</Sidebar.Header>
+    <Separator />
 	<Sidebar.Content>
 		<Sidebar.Group />
 		<Sidebar.Menu>
@@ -86,8 +87,8 @@
 		<div class="mt-auto">
 			<Sidebar.Menu>
 				{#if isAdminUser}
-					<SidebarItem name="MCPanel Settings" icon={ServerCog} />
-					<SidebarItem name="User Management" icon={Users} />
+                    <SidebarItem name="Users" icon={Users} />
+					<SidebarItem name="Settings" icon={ServerCog} />
 				{/if}
 			</Sidebar.Menu>
 		</div>

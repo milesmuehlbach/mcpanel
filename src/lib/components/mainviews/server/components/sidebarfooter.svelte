@@ -2,7 +2,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import User from '$lib/components/mainviews/server/components/user.svelte';
+	// import User from '$lib/components/mainviews/server/components/user.svelte';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 
 	const sidebar = Sidebar.useSidebar();
@@ -36,5 +36,6 @@
 	class={`flex w-full ${isCollapsed ? 'flex-col-reverse items-center gap-2' : 'items-center justify-between gap-2'}`}
 >
 	<Sidebar.Trigger class="size-8 shrink-0 bg-transparent" />
-	<User class="size-8" />
+	<!-- <User class="size-8" /> -->
+    <!-- disabled on 3/24 because it has severe impacts on sidebar expand/collapse ux -@technodot -->
 </div>
