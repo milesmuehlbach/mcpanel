@@ -3,7 +3,6 @@
 	import { Button } from '$lib/components/ui/button';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import ServerIcon from '@lucide/svelte/icons/server';
-
 	let { newServer = () => {} }: { newServer?: () => void } = $props();
 </script>
 
