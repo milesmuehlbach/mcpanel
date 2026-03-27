@@ -73,7 +73,7 @@
 
 <Sidebar.Root collapsible="icon">
 	<Sidebar.Header>
-		<ServerSelector servertitles={['McPanel Test', 'TechnoDot Server']} iconpath={[]} {newServer} />
+		<ServerSelector {newServer} />
 	</Sidebar.Header>
     <Separator />
 	<Sidebar.Content>

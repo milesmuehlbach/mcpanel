@@ -64,6 +64,7 @@ ph = PasswordHasher()
 api = APIRouter()
 V1 = APIRouter(prefix="/v1")
 bearer = HTTPBearer(auto_error=False)
+get_workdir().mkdir(parents=True, exist_ok=True)
 
 init_db()
 JWT_SECRET = get_setting("jwt_secret", secrets.token_urlsafe(32))
