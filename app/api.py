@@ -10,6 +10,7 @@ from pydantic import BaseModel, StringConstraints
 import secrets
 import sqlite3
 from typing import Annotated
+from uuid import UUID
 
 from app.database import (
     create_user,
@@ -19,6 +20,7 @@ from app.database import (
     get_user_permissions as load_user_permissions,
     get_username,
     init_db,
+    get_installed_components,
     install_jre_component,
     install_server_component,
     set_user_permissions,
@@ -367,6 +369,11 @@ async def _v1_components_install(
         case _:
             raise HTTPException(400, "invalid component type")
 
+@V1.get("/components/installed")
+def _v1_components_installed():
+    components = get_installed_components()
+    return {"message": "success", "components": components}
+
 ##################
 # TASK ENDPOINTS #
 ##################
@@ -403,6 +410,13 @@ class InstanceInterface(BaseModel):
 class OptionalInstanceInterface(InstanceInterface):
     uuid: str | None = None
 
+class InstanceParameterInterface(BaseModel):
+    server_uid: str
+    java_uid: str
+    name: str | None = None
+    memory: int | None = None
+    arguments: list[str] | None = None
+
 @V1.get(
     "/instances/list",
     dependencies=[Depends(require_permission("instances.list_instances"))]
@@ -434,5 +448,98 @@ async def _v1_instances_reload(
     else:
         instance_manager.reload_instance(body.uuid)
         return {"message": "success"}
+
+@V1.post(
+    "/instances/create",
+    dependencies=[Depends(require_permission("instances.create_instance"))]
+)
+async def _v1_instances_create(
+    body: InstanceParameterInterface
+):
+    instance = instance_manager.create_instance(
+        server_uid=body.server_uid,
+        java_uid=body.java_uid,
+        name=body.name,
+        memory=body.memory,
+        arguments=body.arguments,
+    )
+    return {"message": "success", "uuid": instance.uuid, "instance": instance.build_info()}
+
+@V1.post(
+    "/instances/{instance_uuid}/start",
+    dependencies=[Depends(require_permission("instances.create_instance"))]
+)
+async def _v1_instances_start(
+    instance_uuid: UUID,
+):
+    if not instance_manager.has_instance(instance_uuid):
+        raise HTTPException(404, "instance not found")
+
+    def start_task() -> dict[str, object]:
+        instance = instance_manager.start_instance(instance_uuid)
+        return {
+            "action": "start",
+            "uuid": str(instance.uuid),
+            "running": instance.running,
+            "instance": instance.build_info(),
+        }
+
+    task_id = task_manager.enqueue(
+        start_task,
+        name=f"Start Instance ({instance_uuid})",
+    )
+    return {"message": "success", "task_id": task_id}
+
+
+@V1.post(
+    "/instances/{instance_uuid}/stop",
+    dependencies=[Depends(require_permission("instances.create_instance"))]
+)
+async def _v1_instances_stop(
+    instance_uuid: UUID,
+):
+    if not instance_manager.has_instance(instance_uuid):
+        raise HTTPException(404, "instance not found")
+
+    def stop_task() -> dict[str, object]:
+        instance = instance_manager.stop_instance(instance_uuid)
+        return {
+            "action": "stop",
+            "uuid": str(instance.uuid),
+            "running": instance.running,
+            "instance": instance.build_info(),
+        }
+
+    task_id = task_manager.enqueue(
+        stop_task,
+        name=f"Stop Instance ({instance_uuid})",
+    )
+    return {"message": "success", "task_id": task_id}
+
+
+@V1.post(
+    "/instances/{instance_uuid}/restart",
+    dependencies=[Depends(require_permission("instances.create_instance"))]
+)
+async def _v1_instances_restart(
+    instance_uuid: UUID,
+):
+    if not instance_manager.has_instance(instance_uuid):
+        raise HTTPException(404, "instance not found")
+
+    def restart_task() -> dict[str, object]:
+        instance = instance_manager.restart_instance(instance_uuid)
+        return {
+            "action": "restart",
+            "uuid": str(instance.uuid),
+            "running": instance.running,
+            "instance": instance.build_info(),
+        }
+
+    task_id = task_manager.enqueue(
+        restart_task,
+        name=f"Restart Instance ({instance_uuid})",
+    )
+    return {"message": "success", "task_id": task_id}
 
 api.include_router(V1)
