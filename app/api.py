@@ -467,7 +467,7 @@ async def _v1_instances_create(
 
 @V1.post(
     "/instances/{instance_uuid:uuid}/start",
-    dependencies=[Depends(require_permission("instances.create_instance"))]
+    dependencies=[Depends(require_permission("instances.start_instance"))]
 )
 async def _v1_instances_start(
     instance_uuid: UUID,
@@ -493,7 +493,7 @@ async def _v1_instances_start(
 
 @V1.post(
     "/instances/{instance_uuid:uuid}/stop",
-    dependencies=[Depends(require_permission("instances.create_instance"))]
+    dependencies=[Depends(require_permission("instances.stop_instance"))]
 )
 async def _v1_instances_stop(
     instance_uuid: UUID,
@@ -519,7 +519,7 @@ async def _v1_instances_stop(
 
 @V1.post(
     "/instances/{instance_uuid:uuid}/restart",
-    dependencies=[Depends(require_permission("instances.create_instance"))]
+    dependencies=[Depends(require_permission("instances.stop_instance"))] # TODO: again, maybe seperate instances.restart_instance or a general instance.manage_instance permission? debate for later
 )
 async def _v1_instances_restart(
     instance_uuid: UUID,
