@@ -4,8 +4,6 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import jwt
-import os
-from pathlib import Path
 from pydantic import BaseModel, StringConstraints
 import secrets
 import sqlite3
@@ -27,12 +25,8 @@ from app.database import (
 )
 from app.downloaders import java, server
 from app.instances import InstanceManager
+from app.paths import WORKING_PATH_ENV, get_workdir
 from app.tasks import TaskManager
-
-WORKING_PATH_ENV = "MCPANEL_PATH"
-
-def get_workdir() -> Path:
-    return Path(os.environ.get(WORKING_PATH_ENV, "./minecraft")).resolve()
 
 def get_user_permissions(uid: int) -> list[str]:
     permissions = load_user_permissions(uid)

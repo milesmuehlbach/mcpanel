@@ -3,7 +3,7 @@ import os
 import pathlib
 import uvicorn
 
-from app.api import WORKING_PATH_ENV as APP_PATH_ENV
+from app.paths import WORKING_PATH_ENV as APP_PATH_ENV
 
 def app_factory():
     from app.server import app

@@ -6,6 +6,7 @@ from pathlib import Path
 import sqlite3
 
 from app.downloaders import java, server
+from app.paths import get_workdir
 
 def _normalize_permissions(value: object) -> list[str]:
     if not isinstance(value, list):
@@ -28,7 +29,9 @@ def _normalize_permissions(value: object) -> list[str]:
     return normalized
 
 def get_db() -> sqlite3.Connection:
-    return sqlite3.connect("minecraft/default.db")
+    db_path = get_workdir() / "default.db"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    return sqlite3.connect(db_path)
 
 def init_db() -> None:
     with get_db() as db:
