@@ -466,7 +466,7 @@ async def _v1_instances_create(
     return {"message": "success", "uuid": instance.uuid, "instance": instance.build_info()}
 
 @V1.post(
-    "/instances/{instance_uuid}/start",
+    "/instances/{instance_uuid:uuid}/start",
     dependencies=[Depends(require_permission("instances.create_instance"))]
 )
 async def _v1_instances_start(
@@ -492,7 +492,7 @@ async def _v1_instances_start(
 
 
 @V1.post(
-    "/instances/{instance_uuid}/stop",
+    "/instances/{instance_uuid:uuid}/stop",
     dependencies=[Depends(require_permission("instances.create_instance"))]
 )
 async def _v1_instances_stop(
@@ -518,7 +518,7 @@ async def _v1_instances_stop(
 
 
 @V1.post(
-    "/instances/{instance_uuid}/restart",
+    "/instances/{instance_uuid:uuid}/restart",
     dependencies=[Depends(require_permission("instances.create_instance"))]
 )
 async def _v1_instances_restart(
