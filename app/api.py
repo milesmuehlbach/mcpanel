@@ -3,7 +3,6 @@ from dataclasses import asdict
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-import json
 import jwt
 import os
 from pathlib import Path
@@ -12,8 +11,20 @@ import secrets
 import sqlite3
 from typing import Annotated
 
+from app.database import (
+    create_user,
+    get_setting,
+    get_user_count,
+    get_user_login_record,
+    get_user_permissions as load_user_permissions,
+    get_username,
+    init_db,
+    install_jre_component,
+    install_server_component,
+    set_user_permissions,
+)
 from app.downloaders import java, server
-# from app.instances import InstanceManager
+from app.instances import InstanceManager
 from app.tasks import TaskManager
 
 WORKING_PATH_ENV = "MCPANEL_PATH"
@@ -21,102 +32,11 @@ WORKING_PATH_ENV = "MCPANEL_PATH"
 def get_workdir() -> Path:
     return Path(os.environ.get(WORKING_PATH_ENV, "./minecraft")).resolve()
 
-def _normalize_permissions(value: object) -> list[str]:
-    if not isinstance(value, list):
-        return []
-
-    normalized: list[str] = []
-    seen: set[str] = set()
-
-    for item in value:
-        if not isinstance(item, str):
-            continue
-
-        permission = item.strip()
-        if not permission or permission in seen:
-            continue
-
-        seen.add(permission)
-        normalized.append(permission)
-
-    return normalized
-
-def get_db() -> sqlite3.Connection:
-    return sqlite3.connect("minecraft/default.db")
-
-def init_db() -> None:
-    with get_db() as db:
-        db.execute("PRAGMA journal_mode=WAL;")
-        db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS settings (
-                key TEXT PRIMARY KEY NOT NULL,
-                value TEXT NOT NULL
-            );
-            """
-        )
-        db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                password_argon2 TEXT NOT NULL,
-                permissions TEXT NOT NULL
-            );
-            """
-        )
-        db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS components (
-                uid TEXT PRIMARY KEY NOT NULL,
-                installed_at TIMESTAMP NOT NULL
-            );
-            """
-        )
-
-def get_setting(key: str, value: str) -> str:
-    with get_db() as db:
-        row = db.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
-        if row is not None:
-            return row[0]
-
-        db.execute(
-            "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
-            (key, value),
-        )
-
-        row = db.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
-        if row is None:
-            raise RuntimeError(f"failed to init setting: {key}")
-
-        return row[0]
-
-def get_user_permissions(uid: int):
-    with get_db() as db:
-        row = db.execute(
-            "SELECT permissions FROM users WHERE id = ?",
-            (uid,),
-        ).fetchone()
-
-    if row is None:
+def get_user_permissions(uid: int) -> list[str]:
+    permissions = load_user_permissions(uid)
+    if permissions is None:
         raise HTTPException(404, "user not found")
-
-    permissions = row[0]
-
-    try:
-        parsed = json.loads(permissions)
-        normalized = _normalize_permissions(parsed)
-    except json.JSONDecodeError:
-        normalized = []
-
-    if permissions != json.dumps(normalized):
-        with get_db() as db:
-            db.execute(
-                "UPDATE users SET permissions = ? WHERE id = ?",
-                (json.dumps(normalized), uid),
-            )
-
-    return normalized
+    return permissions
 
 def has_permissions(uid: int, required_permission: str) -> bool:
     permissions = get_user_permissions(uid)
@@ -134,40 +54,6 @@ def has_permissions(uid: int, required_permission: str) -> bool:
 
     return any(permission in accepted_permissions for permission in permissions)
 
-# hk i'm not sure about func names for update_component_database and remove_component_database
-def update_component_database(uid: str) -> None:
-    with get_db() as db:
-        db.execute(
-            """
-            INSERT INTO components (uid, installed_at)
-            VALUES (?, ?)
-            ON CONFLICT(uid) DO UPDATE SET installed_at = excluded.installed_at
-            """,
-            (uid, datetime.now()),
-        )
-
-def remove_component_database(uid: str) -> None:
-    with get_db() as db:
-        db.execute(
-            "DELETE FROM components WHERE uid = ?",
-            (uid,),
-        )
-
-def get_installed_components() -> dict:
-    with get_db() as db:
-        rows = db.execute("SELECT uid, installed_at FROM components").fetchall()
-
-    return dict(rows)
-
-# TODO: maybe merge into one unified component installation func?
-def install_jre_component(uid: str, sha256: str, workdir: Path) -> None:
-    java.download_runtime(uid, sha256, workdir)
-    update_component_database(uid)
-
-def install_server_component(uid: str, hash: str | None, workdir: Path) -> None:
-    server.download_version(uid, hash, workdir)
-    update_component_database(uid)
-
 ########
 # INIT #
 ########
@@ -180,7 +66,7 @@ bearer = HTTPBearer(auto_error=False)
 init_db()
 JWT_SECRET = get_setting("jwt_secret", secrets.token_urlsafe(32))
 # TODO: ts InstanceManager and TaskManager only work bc we're currently running only ONE FastAPI worker process! scaling to multiple workers fails, ts may need to be db-based in ts (near? far? who tf knows) future
-# instance_manager = InstanceManager()
+instance_manager = InstanceManager(get_workdir())
 task_manager = TaskManager()
 
 def get_auth_payload(
@@ -238,11 +124,7 @@ async def _v1_auth_login(
     username = body.username.lower()
     password = body.password
 
-    with get_db() as db:
-        result = db.execute(
-            "SELECT id, password_argon2 FROM users WHERE username = ?",
-            (username,),
-        ).fetchone()
+    result = get_user_login_record(username)
 
     if result is None:
         raise HTTPException(401, "invalid username or password")
@@ -285,15 +167,7 @@ async def _v1_auth_register(
     password_hash = ph.hash(password)
 
     try:
-        with get_db() as db:
-            db.execute(
-                "INSERT INTO users (username, password_argon2, permissions) VALUES (?, ?, ?)",
-                (
-                    username,
-                    password_hash,
-                    json.dumps([])
-                ),
-            )
+        create_user(username, password_hash, [])
     except sqlite3.IntegrityError:
         raise HTTPException(409, "username already exists")
 
@@ -309,13 +183,8 @@ async def _v1_auth_me(
     if isinstance(uid, bool) or not isinstance(uid, int):
         raise HTTPException(401, "invalid token payload")
 
-    with get_db() as db:
-        row = db.execute(
-            "SELECT username FROM users WHERE id = ?",
-            (uid,),
-        ).fetchone()
-
-    if row is None:
+    username = get_username(uid)
+    if username is None:
         raise HTTPException(401, "invalid token payload")
 
     expires_at = exp if isinstance(exp, int) else None
@@ -325,16 +194,14 @@ async def _v1_auth_me(
         "status": True,
         "user": {
             "id": uid,
-            "username": row[0]
+            "username": username,
         },
         "expires_at": expires_at,
     }
 
 @V1.get("/auth/onboarding")
 async def _v1_auth_onboarding_get():
-    with get_db() as db:
-        user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-
+    user_count = get_user_count()
     if user_count > 0:
         return {"message": "onboarding not allowed", "status": False}
     
@@ -347,9 +214,7 @@ async def _v1_auth_onboarding_post(
     username = body.username
     password = body.password
 
-    with get_db() as db:
-        user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-
+    user_count = get_user_count()
     if user_count > 0:
         raise HTTPException(403, "onboarding not allowed")
 
@@ -362,15 +227,7 @@ async def _v1_auth_onboarding_post(
 
     password_hash = ph.hash(password)
 
-    with get_db() as db:
-        db.execute(
-            "INSERT INTO users (username, password_argon2, permissions) VALUES (?, ?, ?)",
-            (
-                username,
-                password_hash,
-                json.dumps(["admin"])
-            ),
-        )
+    create_user(username, password_hash, ["admin"])
 
     return {"message": "onboarding successful"}
 
@@ -424,11 +281,7 @@ async def _v1_auth_permissions_post(
 
     normalized_permissions = sorted(updated_permissions)
 
-    with get_db() as db:
-        db.execute(
-            "UPDATE users SET permissions = ? WHERE id = ?",
-            (json.dumps(normalized_permissions), target_uid),
-        )
+    set_user_permissions(target_uid, normalized_permissions)
 
     return {"message": "success", "permissions": normalized_permissions}
 
@@ -544,44 +397,42 @@ async def _v1_tasks_status(
 # INSTANCE ENDPOINTS #
 ######################
 
-# TODO: refactor components and db stuff into their own module, so get_installed_components, etc. don't trigger circular import errors -@technodot
+class InstanceInterface(BaseModel):
+    uuid: str
 
-# class InstanceInterface(BaseModel):
-#     uuid: str
+class OptionalInstanceInterface(InstanceInterface):
+    uuid: str | None = None
 
-# class OptionalInstanceInterface(BaseModel):
-#     uuid: str | None = None
+@V1.get(
+    "/instances/list",
+    dependencies=[Depends(require_permission("instances.list_instances"))]
+)
+async def _v1_instances_list():
+    return {"message": "success", "instances": [instance.build_info() for instance in instance_manager.get_instances()]}
 
-# @V1.get(
-#     "/instances/list",
-#     dependencies=[Depends(require_permission("instances.list_instances"))]
-# )
-# async def _v1_instances_list():
-#     return {"message": "success", "instances": [instance.build_info() for instance in instance_manager.list_instances()]}
+@V1.post(
+    "/instances/check",
+    dependencies=[Depends(require_permission("instances.list_instances"))]
+)
+async def _v1_instances_check(
+    body: InstanceInterface
+):
+    if instance_manager.has_instance(body.uuid):
+        return {"message": "success", "status": True}
+    return {"message": "success", "status": False}
 
-# @V1.post(
-#     "/instances/check",
-#     dependencies=[Depends(require_permission("instances.list_instances"))]
-# )
-# async def _v1_instances_check(
-#     body: InstanceInterface
-# ):
-#     if instance_manager.has_instance(body.uuid):
-#         return {"message": "success", "status": True}
-#     return {"message": "success", "status": False}
-
-# @V1.post(
-#     "/instances/reload",
-#     dependencies=[Depends(require_permission("instances.create_instance"))] # TODO: maybe a seperate instances.manage_instances permission is more ideal? figure ts out ltr
-# )
-# async def _v1_instances_reload(
-#     body: OptionalInstanceInterface
-# ):
-#     if body.uuid is None:
-#         instance_manager.scan_instances()
-#         return {"message": "success"}
-#     else:
-#         instance_manager.reload_instance(body.uuid)
-#         return {"message": "success"}
+@V1.post(
+    "/instances/reload",
+    dependencies=[Depends(require_permission("instances.create_instance"))] # TODO: maybe a seperate instances.manage_instances permission is more ideal? figure ts out ltr
+)
+async def _v1_instances_reload(
+    body: OptionalInstanceInterface
+):
+    if body.uuid is None:
+        instance_manager.scan_instances()
+        return {"message": "success"}
+    else:
+        instance_manager.reload_instance(body.uuid)
+        return {"message": "success"}
 
 api.include_router(V1)

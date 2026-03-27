@@ -9,7 +9,7 @@ import subprocess
 import threading
 import uuid
 
-from app.api import get_installed_components
+from app.database import get_installed_components
 
 MEM_DATA = psutil.virtual_memory()
 DEFAULT_MB = max(1024, min(8192, int(MEM_DATA.total / 1024 / 1024 / (4 if platform.system() == "Windows" else 2))))
