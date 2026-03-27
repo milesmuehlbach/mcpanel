@@ -2,6 +2,7 @@ import concurrent.futures
 import hashlib
 import io
 import json
+import os
 import pathlib
 import platform
 import requests
@@ -160,6 +161,89 @@ def _get_java_prefix(member_paths: list[pathlib.PurePosixPath]) -> pathlib.PureP
 
     return ordered_candidates[0]
 
+def _resolve_archive_symlink_target(
+    staged_runtime_path: pathlib.Path,
+    link_path: pathlib.Path,
+    link_target: str,
+    context: str,
+) -> pathlib.Path:
+    if not isinstance(link_target, str) or not link_target:
+        raise ValueError(f"upstream error in runtime archive: invalid symlink target ({context})")
+
+    normalized_target = link_target.replace("\\", "/")
+    if pathlib.PurePosixPath(normalized_target).is_absolute():
+        raise ValueError(f"upstream error in runtime archive: invalid symlink target ({context})")
+
+    resolved_staged_runtime_path = staged_runtime_path.resolve()
+    resolved_target_path = (link_path.parent / normalized_target).resolve()
+
+    try:
+        resolved_target_path.relative_to(resolved_staged_runtime_path)
+    except ValueError:
+        raise ValueError(f"upstream error in runtime archive: invalid symlink target ({context})")
+
+    return resolved_target_path
+
+def _materialize_archive_symlink(
+    link_path: pathlib.Path,
+    link_target: str,
+    resolved_target_path: pathlib.Path,
+    context: str,
+):
+    if link_path.is_symlink() or link_path.exists():
+        if link_path.is_dir() and not link_path.is_symlink():
+            shutil.rmtree(link_path)
+        else:
+            link_path.unlink()
+
+    link_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        os.symlink(link_target, link_path, target_is_directory=resolved_target_path.is_dir())
+        return
+    except (AttributeError, NotImplementedError, OSError):
+        pass
+
+    if resolved_target_path.is_file():
+        shutil.copy2(resolved_target_path, link_path)
+        return
+
+    if resolved_target_path.is_dir():
+        shutil.copytree(resolved_target_path, link_path)
+        return
+
+    raise ValueError(f"upstream error in runtime archive: unsupported symlink target ({context})")
+
+def _finalize_archive_symlinks(
+    staged_runtime_path: pathlib.Path,
+    symlink_entries: list[tuple[pathlib.Path, str, str]],
+):
+    pending_entries = symlink_entries[:]
+    while pending_entries:
+        next_pending_entries: list[tuple[pathlib.Path, str, str]] = []
+        progress_made = False
+
+        for link_path, link_target, context in pending_entries:
+            resolved_target_path = _resolve_archive_symlink_target(
+                staged_runtime_path,
+                link_path,
+                link_target,
+                context,
+            )
+
+            if not (resolved_target_path.exists() or resolved_target_path.is_symlink()):
+                next_pending_entries.append((link_path, link_target, context))
+                continue
+
+            _materialize_archive_symlink(link_path, link_target, resolved_target_path, context)
+            progress_made = True
+
+        if not progress_made:
+            unresolved_context = ", ".join(context for _, _, context in next_pending_entries[:3])
+            raise ValueError(f"upstream error in runtime archive: unresolved symlink target ({unresolved_context})")
+
+        pending_entries = next_pending_entries
+
 def _extract_zip_runtime(zip_content: bytes, runtime_path: pathlib.Path):
     runtime_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -182,6 +266,7 @@ def _extract_zip_runtime(zip_content: bytes, runtime_path: pathlib.Path):
             staged_runtime_path.mkdir(parents=True, exist_ok=True)
 
             extracted_files = 0
+            symlink_entries: list[tuple[pathlib.Path, str, str]] = []
             for info in archive.infolist():
                 member_path = _get_archive_member_path(info.filename)
                 if java_home_prefix != pathlib.PurePosixPath("."):
@@ -203,7 +288,19 @@ def _extract_zip_runtime(zip_content: bytes, runtime_path: pathlib.Path):
 
                 mode = info.external_attr >> 16
                 if mode and stat.S_ISLNK(mode):
-                    raise ValueError(f"upstream error in runtime archive: symlinks are not supported ({info.filename})")
+                    with archive.open(info, "r") as member_file:
+                        symlink_target_data = member_file.read()
+
+                    try:
+                        symlink_target = symlink_target_data.decode("utf-8")
+                    except UnicodeDecodeError:
+                        raise ValueError(f"upstream error in runtime archive: invalid symlink target ({info.filename})")
+
+                    if "\x00" in symlink_target:
+                        raise ValueError(f"upstream error in runtime archive: invalid symlink target ({info.filename})")
+
+                    symlink_entries.append((target_path, symlink_target, info.filename))
+                    continue
 
                 with archive.open(info, "r") as member_file:
                     data = member_file.read()
@@ -213,6 +310,8 @@ def _extract_zip_runtime(zip_content: bytes, runtime_path: pathlib.Path):
 
                 _write_runtime_file(target_path, data, mode=mode)
                 extracted_files += 1
+
+            _finalize_archive_symlinks(staged_runtime_path, symlink_entries)
 
             if extracted_files == 0:
                 raise ValueError("upstream error in runtime archive: empty JAVA_HOME")
@@ -241,7 +340,7 @@ def _extract_tar_gz_runtime(tar_gz_content: bytes, runtime_path: pathlib.Path):
             [
                 _get_archive_member_path(member.name)
                 for member in archive.getmembers()
-                if member.isfile()
+                if member.isfile() or member.issym() or member.islnk()
             ]
         )
 
@@ -250,6 +349,7 @@ def _extract_tar_gz_runtime(tar_gz_content: bytes, runtime_path: pathlib.Path):
             staged_runtime_path.mkdir(parents=True, exist_ok=True)
 
             extracted_files = 0
+            symlink_entries: list[tuple[pathlib.Path, str, str]] = []
             for member in archive.getmembers():
                 member_path = _get_archive_member_path(member.name)
                 if java_home_prefix != pathlib.PurePosixPath("."):
@@ -269,10 +369,14 @@ def _extract_tar_gz_runtime(tar_gz_content: bytes, runtime_path: pathlib.Path):
                     target_path.mkdir(parents=True, exist_ok=True)
                     continue
 
-                if member.issym() or member.islnk():
-                    raise ValueError(f"upstream error in runtime archive: links are not supported ({member.name})")
+                if member.issym():
+                    if "\x00" in member.linkname:
+                        raise ValueError(f"upstream error in runtime archive: invalid symlink target ({member.name})")
 
-                if not member.isfile():
+                    symlink_entries.append((target_path, member.linkname, member.name))
+                    continue
+
+                if not (member.isfile() or member.islnk()):
                     raise ValueError(f"upstream error in runtime archive: unsupported entry type ({member.name})")
 
                 extracted_member = archive.extractfile(member)
@@ -285,6 +389,8 @@ def _extract_tar_gz_runtime(tar_gz_content: bytes, runtime_path: pathlib.Path):
                 mode = member.mode or (0o755 if relative_member_path.name in JAVA_EXECUTABLE_NAMES else 0o644)
                 _write_runtime_file(target_path, data, mode=mode)
                 extracted_files += 1
+
+            _finalize_archive_symlinks(staged_runtime_path, symlink_entries)
 
             if extracted_files == 0:
                 raise ValueError("upstream error in runtime archive: empty JAVA_HOME")
