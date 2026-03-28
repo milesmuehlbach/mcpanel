@@ -2,6 +2,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import { Progress } from '$lib/components/ui/progress';
+	import Step1 from '$lib/components/mainviews/creation/step1.svelte'
 
 	const totalSteps = 3;
 	let step = $state(1);
@@ -23,16 +24,9 @@
 
 <div class="flex min-h-screen w-full items-center justify-center bg-background p-4 sm:p-8">
 	<Card.Root class="w-full max-w-2xl">
-		<Card.Header class="gap-4">
-			<div>
-				<Card.Title>Create New Server</Card.Title>
-				<Card.Description>Step {step} of {totalSteps}</Card.Description>
-			</div>
-		</Card.Header>
-
-		<Card.Content class="min-h-56 py-6">
+		<Card.Content class="min-h-56">
 			{#if step === 1}
-				<h1>step 1</h1>
+				<Step1 {incrementStep}/>
 			{:else if step === 2}
 				<div class="space-y-2">
 					<h2 class="text-xl font-semibold">Server Configuration</h2>
@@ -48,15 +42,9 @@
 			{/if}
 		</Card.Content>
 
-		<Card.Footer class="flex flex-col items-stretch gap-4 border-t pt-6">
+		<Card.Footer class="flex flex-col border-t pt-6">
 			<div class="flex items-center justify-between gap-4">
 				<Progress value={progressValue} max={100} class="h-2 w-full" />
-			</div>
-			<div class="flex justify-between">
-				<Button type="button" variant="outline" onclick={decrementStep} disabled={step === 1}
-					>Back</Button
-				>
-				<Button type="button" onclick={incrementStep} disabled={step === totalSteps}>Next</Button>
 			</div>
 		</Card.Footer>
 	</Card.Root>
