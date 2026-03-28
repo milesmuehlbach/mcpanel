@@ -25,7 +25,7 @@ from app.database import (
 )
 from app.downloaders import java, server
 from app.instances import InstanceManager
-from app.paths import WORKING_PATH_ENV, get_workdir
+from app.paths import get_workdir
 from app.tasks import TaskManager
 
 def get_user_permissions(uid: int) -> list[str]:
@@ -460,6 +460,32 @@ async def _v1_instances_create(
     )
     return {"message": "success", "uuid": instance.uuid, "instance": instance.build_info()}
 
+@V1.get(
+    "/instances/{instance_uuid:uuid}/details",
+    dependencies=[Depends(require_permission("instances.list_instances"))]
+)
+async def _v1_instances_details(
+    instance_uuid: UUID
+):
+    if not instance_manager.has_instance(instance_uuid):
+        raise HTTPException(404, "instance not found")
+
+    instance = instance_manager.get_instance(instance_uuid)
+    return {"message": "success", "instance": instance.build_info()}
+
+@V1.get(
+    "/instances/{instance_uuid:uuid}/status",
+    dependencies=[Depends(require_permission("instances.list_instances"))]
+)
+async def _v1_instances_status(
+    instance_uuid: UUID
+):
+    if not instance_manager.has_instance(instance_uuid):
+        raise HTTPException(404, "instance not found")
+
+    instance = instance_manager.get_instance(instance_uuid)
+    return {"message": "success", "status": "running" if instance.running else "stopped", "running": instance.running}
+
 @V1.post(
     "/instances/{instance_uuid:uuid}/start",
     dependencies=[Depends(require_permission("instances.start_instance"))]
@@ -484,7 +510,6 @@ async def _v1_instances_start(
         name=f"Start Instance ({instance_uuid})",
     )
     return {"message": "success", "task_id": task_id}
-
 
 @V1.post(
     "/instances/{instance_uuid:uuid}/stop",
@@ -511,10 +536,12 @@ async def _v1_instances_stop(
     )
     return {"message": "success", "task_id": task_id}
 
-
 @V1.post(
     "/instances/{instance_uuid:uuid}/restart",
-    dependencies=[Depends(require_permission("instances.stop_instance"))] # TODO: again, maybe seperate instances.restart_instance or a general instance.manage_instance permission? debate for later
+    dependencies=[
+        Depends(require_permission("instances.start_instance")),
+        Depends(require_permission("instances.stop_instance")),
+    ]
 )
 async def _v1_instances_restart(
     instance_uuid: UUID,

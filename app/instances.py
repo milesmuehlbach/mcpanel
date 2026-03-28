@@ -66,6 +66,7 @@ class Instance:
         now = _utcnow()
         self.created_at = now
         self.updated_at = now
+        self.started_at = None
 
         self._name = ""
         self._jar = None
@@ -93,18 +94,21 @@ class Instance:
 
         self.created_at = now
         self.updated_at = now
-    
+        self.started_at = None
+
     def build_info(self) -> dict:
         return {
             "version": 1,
             "uuid": str(self.uuid),
             "name": self.name,
+            "running": self.running,
             "jar": self.jar,
             "java": self.java,
             "memory": self.memory,
             "arguments": list(self.arguments),
             "created_at": _to_epoch_seconds(self.created_at),
-            "updated_at": _to_epoch_seconds(self.updated_at)
+            "updated_at": _to_epoch_seconds(self.updated_at),
+            "started_at": _to_epoch_seconds(self.started_at) if self.started_at is not None else None
         }
 
     @property
@@ -307,6 +311,8 @@ class Instance:
             bufsize=1
         )
         self.running = True
+        self.started_at = _utcnow()
+        self.save_instance_config()
 
         self.bridge_thread = threading.Thread(target=self._bridge_runner, daemon=True)
         self.bridge_thread.start()
@@ -318,6 +324,8 @@ class Instance:
             self.sendline("stop")
             self.process.wait()
             self.running = False
+            # self.started_at = None # NOTE: i don't think that we should clear the timestamp state on stop bc it could be useful in future anyways
+            # self.save_instance_config()
         
     def sendline(self, cmd):
         if self.process and self.running and self.process.stdin:
