@@ -57,20 +57,20 @@
 			filtered = filtered.filter((component) => component.version.startsWith('release-'));
 		}
 
-		return filtered;
+		return [...filtered].sort((a, b) => {
+			const aTime = Date.parse(a.released_at);
+			const bTime = Date.parse(b.released_at);
+
+			if (Number.isNaN(aTime) || Number.isNaN(bTime)) {
+				return b.display_version.localeCompare(a.display_version, undefined, {
+					numeric: true,
+					sensitivity: 'base'
+				});
+			}
+
+			return bTime - aTime;
+		});
 	});
-
-	function getJavaVersion(input: string): string {
-		const parts = input.split('-');
-		const version = parts[1];
-		if (!version) return "jre:com.azul.java:java21";
-
-		const targetValue = Number(version.split('.')[1]);
-		if (isNaN(targetValue)) return "jre:com.azul.java:java21";
-		if (targetValue <= 12) return "jre:com.azul.java:java8";
-		if (targetValue <= 19) return "jre:com.azul.java:java17";
-		return "jre:com.azul.java:java21";
-	}
 
 	const versionLabel = $derived(
 		filteredVersions.find((version) => version.version === selectedVersion)?.display_version ??
@@ -127,7 +127,7 @@
 					<Select.Trigger id="software">
 						{softwareLabel}
 					</Select.Trigger>
-					<Select.Content>
+					<Select.Content side="bottom" class="max-h-72 [--bits-select-anchor-height:18rem]">
 						{#each softwares as cursoftware (cursoftware.value)}
 							<Select.Item {...cursoftware} />
 						{/each}
@@ -148,7 +148,7 @@
 							{versionLabel}
 						{/if}
 					</Select.Trigger>
-					<Select.Content>
+					<Select.Content side="bottom" class="max-h-72 [--bits-select-anchor-height:18rem]">
 						{#each filteredVersions as version (version.uid)}
 							<Select.Item value={version.version} label={version.display_version} />
 						{/each}
