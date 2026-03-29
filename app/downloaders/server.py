@@ -246,3 +246,40 @@ def download_version(uid: str, hash: str | None, base_path: pathlib.Path) -> Non
             return downloader_cls.download_version(uid, hash, base_path)
     
     raise ValueError(f"unknown server version uid: {uid}")
+
+def get_recommended_jre(server_uid: str) -> str:
+    s = requests.Session()
+    r = s.get(MojangDownloader.MOJANG_MANIFEST_URL)
+    r.raise_for_status()
+    
+    try:
+        json = r.json()
+    except:
+        raise ValueError("upstream error in mojang metadata: invalid json")
+    
+    try:
+        id = "-".join(server_uid.split(":")[2].split("-")[1:-1 if server_uid.split(":")[1] in ["paper"] else None])
+    except:
+        raise ValueError(f"invalid server uid: {server_uid}")
+    
+    for version in json.get("versions", []):
+        if version.get("id") != id: continue
+
+        r = s.get(version.get("url"))
+        r.raise_for_status()
+
+        if hashlib.sha1(r.content).hexdigest() != version.get("sha1"):
+            raise ValueError("upstream error in mojang metadata: hash mismatch in version metadata")
+        
+        try:
+            json = r.json()
+        except:
+            raise ValueError("upstream error in mojang metadata: invalid json")
+        
+        java_version = json.get("javaVersion", {}).get("majorVersion", None)
+        if java_version is None:
+            raise ValueError("upstream error in mojang metadata: missing java version data")
+        
+        return f"jre:com.azul.java:java{java_version}"
+
+    raise ValueError(f"unknown server component uid: {server_uid}")

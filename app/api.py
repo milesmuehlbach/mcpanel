@@ -313,6 +313,16 @@ async def _v1_components_list(
         case _:
             raise HTTPException(400, "invalid component type")
 
+@V1.get(
+    "/components/get_recommended_jre",
+    dependencies=[Depends(require_permission("components.list_components"))]
+)
+async def _v1_components_get_recommended_jre(
+    server_uid: str,
+):
+    return {"message": "success", "component": server.get_recommended_jre(server_uid)}
+
+
 @V1.post(
     "/components/install",
     dependencies=[Depends(require_permission("components.install_component"))],
