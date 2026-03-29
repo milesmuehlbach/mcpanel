@@ -1,26 +1,27 @@
 <script lang="ts">
 	import * as Field from '$lib/components/ui/field';
-	import * as Select from '$lib/components/ui/select'
+	import * as Select from '$lib/components/ui/select';
 	// import { Input } from '$lib/components/ui/input';
-	import { Checkbox } from '$lib/components/ui/checkbox'
+	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { Label } from '$lib/components/ui/label';
 
 	import { onMount } from 'svelte';
 
-	let { incrementStep = () => {} }: { incrementStep?: () => void; } = $props();
+	let { incrementStep = () => {} }: { incrementStep?: () => void } = $props();
 
-	let serverSoftware = $state("mojang");
-
-	let snapshots = $state(false)
+	let serverSoftware = $state('mojang');
+	let selectedVersion = $state('');
+	let snapshots = $state(false);
+	let isLoadingVersions = $state(true);
+	let versionsError = $state<string | null>(null);
 
 	const softwares = [
-		{ value: "mojang", label: "Vanilla" },
-		{ value: "paper", label: "Paper" }
+		{ value: 'mojang', label: 'Vanilla' },
+		{ value: 'paper', label: 'Paper' }
 	];
 
 	const softwareLabel = $derived(
-		softwares.find((d) => d.value === serverSoftware)?.label ??
-		"Choose server software"
+		softwares.find((d) => d.value === serverSoftware)?.label ?? 'Choose server software'
 	);
 
 	type Hashes = {
@@ -47,55 +48,72 @@
 		components: Component[];
 	};
 
-	function setNewData() {
-		filteredVersions = filterVersionData(serverSoftware, snapshots, await minecraftVersions)
+	let minecraftVersions = $state<Component[]>([]);
+
+	const filteredVersions = $derived.by(() => {
+		let filtered = minecraftVersions.filter((component) => component.component === serverSoftware);
+
+		if (!snapshots) {
+			filtered = filtered.filter((component) => component.version.startsWith('release-'));
+		}
+
+		return filtered;
+	});
+
+	function getJavaVersion(input: string): string {
+		const parts = input.split('-');
+		const version = parts[1];
+		if (!version) return "jre:com.azul.java:java21";
+
+		const targetValue = Number(version.split('.')[1]);
+		if (isNaN(targetValue)) return "jre:com.azul.java:java21";
+		if (targetValue <= 12) return "jre:com.azul.java:java8";
+		if (targetValue <= 19) return "jre:com.azul.java:java17";
+		return "jre:com.azul.java:java21";
 	}
 
-	function filterVersionData(software: string, snapshot: boolean, data: ApiResponse) {
-		let filtered = data.components.filter(c =>
-			c.component === software
-		);
-		if (!snapshot) {
-			filtered = filtered.filter(c => c.version.startsWith("release-"));
-		}
-		if (filtered.length === 0) {
-			return;
-		}
-		return filtered;
-	}
+	const versionLabel = $derived(
+		filteredVersions.find((version) => version.version === selectedVersion)?.display_version ??
+			'Choose Minecraft version'
+	);
 
 	async function getMinecraftVersions() {
-		try {
-			const response = await fetch('/api/v1/components/list?type=server', {
-				headers: {
-					Authorization: `Bearer ${sessionStorage.getItem('token')}`
-				}
-			});
-
-			if (!response.ok) {
-				throw new Error("response not ok")
+		const response = await fetch('/api/v1/components/list?type=server', {
+			headers: {
+				Authorization: `Bearer ${sessionStorage.getItem('token')}`
 			}
+		});
 
-			const data: ApiResponse = await response.json();
-
-			return data;
-
-		} catch (error) {
-			console.error(error);
-			return;
+		if (!response.ok) {
+			throw new Error('Failed to fetch Minecraft versions');
 		}
+
+		const data: ApiResponse = await response.json();
+		return data.components;
 	}
 
-	let minecraftVersions = getMinecraftVersions();
-	let filteredVersions = $state(filterVersionData('vanilla', false, minecraftVersions));
+	async function loadMinecraftVersions() {
+		isLoadingVersions = true;
+		versionsError = null;
+
+		try {
+			minecraftVersions = await getMinecraftVersions();
+		} catch (error) {
+			console.error(error);
+			minecraftVersions = [];
+			versionsError = 'Unable to load versions. Please try again.';
+		} finally {
+			isLoadingVersions = false;
+		}
+	}
 
 	function nextStep(): void {
 		incrementStep();
 	}
 
 	onMount(() => {
-
-	})
+		void loadMinecraftVersions();
+	});
 </script>
 
 <form onsubmit={nextStep}>
@@ -106,7 +124,7 @@
 			<Field.Field>
 				<Field.Label for="software">Server Software</Field.Label>
 				<Select.Root type="single" bind:value={serverSoftware}>
-					<Select.Trigger id="department">
+					<Select.Trigger id="software">
 						{softwareLabel}
 					</Select.Trigger>
 					<Select.Content>
@@ -117,19 +135,32 @@
 				</Select.Root>
 			</Field.Field>
 			<Field.Field>
-				<Field.Label for="software">Minecraft Version</Field.Label>
-				<Select.Root type="single" bind:value={serverSoftware}>
-					<Select.Trigger id="department">
-						{softwareLabel}
+				<Field.Label for="minecraft-version">Minecraft Version</Field.Label>
+				<Select.Root
+					type="single"
+					bind:value={selectedVersion}
+					disabled={isLoadingVersions || filteredVersions.length === 0}
+				>
+					<Select.Trigger id="minecraft-version">
+						{#if isLoadingVersions}
+							Loading versions...
+						{:else}
+							{versionLabel}
+						{/if}
 					</Select.Trigger>
 					<Select.Content>
-						{#each softwares as cursoftware (cursoftware.value)}
-							<Select.Item {...cursoftware} onclick={setNewData}/>
+						{#each filteredVersions as version (version.uid)}
+							<Select.Item value={version.version} label={version.display_version} />
 						{/each}
 					</Select.Content>
 				</Select.Root>
+				{#if versionsError}
+					<p class="text-sm text-destructive">{versionsError}</p>
+				{:else if !isLoadingVersions && filteredVersions.length === 0}
+					<p class="text-sm text-muted-foreground">No versions found for the selected software.</p>
+				{/if}
 				<div class="flex items-center gap-3">
-					<Checkbox id="terms" bind:value={snapshots} onclick={setNewData} />
+					<Checkbox id="terms" bind:checked={snapshots} />
 					<Label for="terms">Show snapshots</Label>
 				</div>
 			</Field.Field>
