@@ -454,6 +454,8 @@
 			</Field.Field>
 			<Accordion.Root type="single">
 				<Accordion.Item value="item-1">
+                    <!-- maybe the WORST POSSIBLE UX EVER -@technodot -->
+                    <!-- TODO: too busy to fix rn but i WILL redo ts later -->
 					<Accordion.Trigger>Advanced options (Configure Java runtime)</Accordion.Trigger>
 					<Accordion.Content>
 						<p>
