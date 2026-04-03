@@ -1,42 +1,27 @@
-# sv
+# mcpanel
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+mcpanel is a comprehensive Minecraft server hosting platform.<br>
+spanning all server softwares and game versions, we are a open-source self-hostable alternative to platforms like Aternos
 
-## Creating a project
+### features
 
-If you're seeing this, you've probably already done this step. Congrats!
+- interactive server switching
+- full level of customization and ease-of-use as Aternos/Exaroton
+- fine-grained permissions system
+- open-source
+- self-hostable
+- we (@TechDudie) personally uses it in his friend group
+- free? idfk
 
-```sh
-# create a new project
-npx sv create my-app
-```
+### technical details for the hc reviewers
 
-To recreate this project with the same configuration:
+this was a collaborative project in between @milesmuehlbach and @TechDudie.
+- svelte frontend w/ adapter-static in SSG, utilizes tailwind v4 & shadcn-svelte for HOLY PEAK ui, handled by @milesmuehlbach
+- async fastapi backend and stateful task management, utilizes LOTS of 3p apis/cdns for very peak reasons, handled by @TechDudie
 
-```sh
-# recreate this project
-bun x sv@0.12.7 create --template minimal --types ts --add prettier tailwindcss="plugins:typography,forms" sveltekit-adapter="adapter:static" mcp="ide:claude-code,vscode,opencode+setup:remote" eslint --install bun .
-```
+### installation
 
-## Developing
+on Windows, i/actions will build standalone binaries closer to launch<br>
+or maybe even an installer that automatically configures services
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+@milesmuehlbach got docker right?
