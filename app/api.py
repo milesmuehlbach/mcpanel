@@ -1,7 +1,9 @@
+import asyncio
 from argon2 import PasswordHasher
 from dataclasses import asdict
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import jwt
 from pydantic import BaseModel, StringConstraints
@@ -101,6 +103,19 @@ def require_permission(required_permission: str):
             raise HTTPException(403, "insufficient permissions")
 
     return dependency
+
+def _format_sse(data: str, event: str | None = None, event_id: int | None = None) -> str:
+    lines: list[str] = []
+    if event_id is not None:
+        lines.append(f"id: {event_id}")
+    if event is not None:
+        lines.append(f"event: {event}")
+
+    payload_lines = data.splitlines() if data else [""]
+    for line in payload_lines:
+        lines.append(f"data: {line}")
+
+    return "\n".join(lines) + "\n\n"
 
 ##################
 # AUTH ENDPOINTS #
@@ -573,5 +588,55 @@ async def _v1_instances_restart(
         name=f"Restart Instance ({instance_uuid})",
     )
     return {"message": "success", "task_id": task_id}
+
+@V1.get(
+    "/instances/{instance_uuid:uuid}/logs",
+    dependencies=[Depends(require_permission("instances.view_logs"))]
+)
+async def _v1_instances_logs(
+    instance_uuid: UUID,
+    request: Request,
+):
+    if not instance_manager.has_instance(instance_uuid):
+        raise HTTPException(404, "instance not found")
+
+    instance = instance_manager.get_instance(instance_uuid)
+
+    start_index = 0
+    last_event_id = request.headers.get("last-event-id")
+    if last_event_id is not None:
+        try:
+            start_index = max(0, int(last_event_id) + 1)
+        except ValueError:
+            start_index = 0
+
+    async def stream_logs():
+        next_index = start_index
+        yield _format_sse("connected", event="ready")
+
+        while True:
+            if await request.is_disconnected():
+                break
+
+            while next_index < len(instance.logs):
+                yield _format_sse(instance.logs[next_index], event="log", event_id=next_index)
+                next_index += 1
+
+            if not instance.running and next_index >= len(instance.logs):
+                yield _format_sse("instance stopped", event="end")
+                break
+
+            yield ": keepalive\n\n"
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(
+        stream_logs(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 api.include_router(V1)

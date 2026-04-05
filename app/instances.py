@@ -82,6 +82,7 @@ class Instance:
         self.process = None
         self.running = False
         self.bridge_thread = None
+        self.logs = [] # NOTE: log capture is super simple atm. not particularly robust. instead of capturing stdout in rt, maybe forward latest.log as it updates?
 
     def set_defaults(self):
         now = _utcnow()
@@ -341,6 +342,7 @@ class Instance:
                 break
             
             print(f"[SERVER] {lineout.strip()}")
+            self.logs.append(lineout.strip())
             
         self.running = False
 
@@ -506,3 +508,7 @@ class InstanceManager:
                 errors.append((instance.uuid, e))
 
         return errors
+
+    def get_instance_logs(self, instance_uuid: uuid.UUID | str) -> list[str]:
+        instance = self.get_instance(instance_uuid)
+        return instance.logs
