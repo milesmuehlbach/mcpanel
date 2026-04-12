@@ -9,6 +9,7 @@ import subprocess
 import threading
 from typing import Literal, TypedDict
 import uuid
+from colorama import Fore, Style, just_fix_windows_console
 
 from app.database import get_installed_components
 
@@ -48,6 +49,11 @@ ConsoleStream = Literal["stdin", "stdout"]
 class ConsoleEntry(TypedDict):
     stream: ConsoleStream
     data: str
+
+just_fix_windows_console()
+SERVER_LABEL_COLOR = Fore.LIGHTMAGENTA_EX
+SERVER_COLON_COLOR = Fore.WHITE
+COLOR_RESET = Style.RESET_ALL
 
 def _utcnow() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc)
@@ -340,6 +346,7 @@ class Instance:
             command = cmd.rstrip("\r\n")
             self.process.stdin.write(command + "\n")
             self.process.stdin.flush()
+            print(f"{SERVER_LABEL_COLOR}SERVER{SERVER_COLON_COLOR}:{COLOR_RESET}   >{command}{COLOR_RESET}")
             self.console.append({"stream": "stdin", "data": command})
         else:
             raise RuntimeError(f"instance {self.uuid} is not running")
@@ -351,7 +358,7 @@ class Instance:
                 break
 
             lineout = lineout.rstrip("\r\n")
-            print(f"[SERVER] {lineout}")
+            print(f"{SERVER_LABEL_COLOR}SERVER{SERVER_COLON_COLOR}:{COLOR_RESET}   {lineout}{COLOR_RESET}")
             self.console.append({"stream": "stdout", "data": lineout})
             
         self.running = False
