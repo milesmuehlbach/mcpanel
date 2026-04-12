@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import threading
+from typing import Literal, TypedDict
 import uuid
 
 from app.database import get_installed_components
@@ -41,6 +42,12 @@ DEFAULT_PARAMTERS = [
 
 JAVA_COMPONENT_UID_PATTERN = re.compile(r"^jre:(?!.*\.{2})[a-z.]+:[a-z0-9]+$")
 SERVER_COMPONENT_UID_PATTERN = re.compile(r"^server:[a-z]+:(?!.*\.{2})[a-z0-9.-]+$")
+
+ConsoleStream = Literal["stdin", "stdout"]
+
+class ConsoleEntry(TypedDict):
+    stream: ConsoleStream
+    data: str
 
 def _utcnow() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc)
@@ -82,7 +89,7 @@ class Instance:
         self.process = None
         self.running = False
         self.bridge_thread = None
-        self.logs = [] # NOTE: log capture is super simple atm. not particularly robust. instead of capturing stdout in rt, maybe forward latest.log as it updates?
+        self.console: list[ConsoleEntry] = [] # NOTE: log capture is super simple atm. not particularly robust. instead of capturing stdout in rt, maybe forward latest.log as it updates?
 
     def set_defaults(self):
         now = _utcnow()
@@ -328,10 +335,12 @@ class Instance:
             # self.started_at = None # NOTE: i don't think that we should clear the timestamp state on stop bc it could be useful in future anyways
             # self.save_instance_config()
         
-    def sendline(self, cmd):
+    def sendline(self, cmd: str):
         if self.process and self.running and self.process.stdin:
-            self.process.stdin.write(cmd + "\n")
-            self.process.stdin.flush() 
+            command = cmd.rstrip("\r\n")
+            self.process.stdin.write(command + "\n")
+            self.process.stdin.flush()
+            self.console.append({"stream": "stdin", "data": command})
         else:
             raise RuntimeError(f"instance {self.uuid} is not running")
     
@@ -340,9 +349,10 @@ class Instance:
             lineout = self.process.stdout.readline()
             if not lineout:
                 break
-            
-            print(f"[SERVER] {lineout.strip()}")
-            self.logs.append(lineout.strip())
+
+            lineout = lineout.rstrip("\r\n")
+            print(f"[SERVER] {lineout}")
+            self.console.append({"stream": "stdout", "data": lineout})
             
         self.running = False
 
@@ -509,6 +519,6 @@ class InstanceManager:
 
         return errors
 
-    def get_instance_logs(self, instance_uuid: uuid.UUID | str) -> list[str]:
+    def get_instance_console(self, instance_uuid: uuid.UUID | str) -> list[ConsoleEntry]:
         instance = self.get_instance(instance_uuid)
-        return instance.logs
+        return instance.console

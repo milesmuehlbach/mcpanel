@@ -117,6 +117,28 @@ def _format_sse(data: str, event: str | None = None, event_id: int | None = None
 
     return "\n".join(lines) + "\n\n"
 
+
+def _normalize_console_entry(entry: object) -> tuple[str, str]:
+    stream = "stdout"
+    data = ""
+
+    if isinstance(entry, dict):
+        stream_value = entry.get("stream")
+        if stream_value in {"stdout", "stdin"}:
+            stream = stream_value
+
+        data_value = entry.get("data")
+        if isinstance(data_value, str):
+            data = data_value
+        elif data_value is not None:
+            data = str(data_value)
+    elif isinstance(entry, str):
+        data = entry
+    elif entry is not None:
+        data = str(entry)
+
+    return stream, data
+
 ##################
 # AUTH ENDPOINTS #
 ##################
@@ -437,6 +459,9 @@ class InstanceParameterInterface(BaseModel):
     memory: int | None = None
     arguments: list[str] | None = None
 
+class CommandInterface(BaseModel):
+    command: str
+
 @V1.get(
     "/instances/list",
     dependencies=[Depends(require_permission("instances.list_instances"))]
@@ -590,10 +615,10 @@ async def _v1_instances_restart(
     return {"message": "success", "task_id": task_id}
 
 @V1.get(
-    "/instances/{instance_uuid:uuid}/logs",
-    dependencies=[Depends(require_permission("instances.view_logs"))]
+    "/instances/{instance_uuid:uuid}/console",
+    dependencies=[Depends(require_permission("instances.read_console"))]
 )
-async def _v1_instances_logs(
+async def _v1_instances_console_get(
     instance_uuid: UUID,
     request: Request,
 ):
@@ -610,7 +635,7 @@ async def _v1_instances_logs(
         except ValueError:
             start_index = 0
 
-    async def stream_logs():
+    async def stream_console():
         next_index = start_index
         yield _format_sse("connected", event="ready")
 
@@ -618,11 +643,12 @@ async def _v1_instances_logs(
             if await request.is_disconnected():
                 break
 
-            while next_index < len(instance.logs):
-                yield _format_sse(instance.logs[next_index], event="log", event_id=next_index)
+            while next_index < len(instance.console):
+                stream, line = _normalize_console_entry(instance.console[next_index])
+                yield _format_sse(line, event=stream, event_id=next_index)
                 next_index += 1
 
-            if not instance.running and next_index >= len(instance.logs):
+            if not instance.running and next_index >= len(instance.console):
                 yield _format_sse("instance stopped", event="end")
                 break
 
@@ -630,7 +656,7 @@ async def _v1_instances_logs(
             await asyncio.sleep(0.5)
 
     return StreamingResponse(
-        stream_logs(),
+        stream_console(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -638,5 +664,20 @@ async def _v1_instances_logs(
             "X-Accel-Buffering": "no",
         },
     )
+
+@V1.post(
+    "/instances/{instance_uuid:uuid}/console",
+    dependencies=[Depends(require_permission("instances.write_console"))]
+)
+async def _v1_instances_console_post(
+    instance_uuid: UUID,
+    body: CommandInterface,
+):
+    if not instance_manager.has_instance(instance_uuid):
+        raise HTTPException(404, "instance not found")
+
+    instance = instance_manager.get_instance(instance_uuid)
+    instance.sendline(body.command)
+    return {"message": "success"}
 
 api.include_router(V1)
