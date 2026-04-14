@@ -3,45 +3,34 @@
 	import LoginView from '$lib/components/mainviews/login.svelte';
 	import OnboardingView from '$lib/components/mainviews/onboard.svelte';
 	import ServerCreationView from '$lib/components/mainviews/creation/servercreation.svelte';
+	import { Route, Router, listen, navigate } from 'svelte5-router';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	type View = 'server' | 'login' | 'servercreation' | 'onboarding';
-
-	const VALID_VIEWS: View[] = ['server', 'login', 'servercreation', 'onboarding'];
+	const PUBLIC_PATHS = new Set(['/login', '/onboarding']);
+	const PRIVATE_PATHS = new Set(['/servers', '/servers/new']);
 
 	let initialized = $state(false);
-	let view = $state<View>('login');
+	let currentPath = $state('/');
 
-	let isDirty = $derived(view === 'servercreation');
+	let isDirty = $derived(currentPath === '/servers/new');
 
-	function getViewFromUrl(): View {
-		const url = new URL(window.location.href);
-		const urlView = url.searchParams.get('view');
-
-		if (urlView && VALID_VIEWS.includes(urlView as View)) {
-			return urlView as View;
+	function normalizePath(pathname: string): string {
+		if (pathname.length > 1 && pathname.endsWith('/')) {
+			return pathname.slice(0, -1);
 		}
 
-		return 'login';
+		return pathname || '/';
 	}
 
-	function setView(newView: View, replaceState = true) {
-		view = newView;
-		const url = new URL(window.location.href);
-		url.searchParams.set('view', newView);
-
-		const target = `${url.pathname}${url.search}${url.hash}`;
-		if (replaceState) {
-			window.history.replaceState(window.history.state, '', target);
-			return;
-		}
-
-		window.history.pushState(window.history.state, '', target);
+	function go(to: string, replace = true): void {
+		const target = normalizePath(to);
+		currentPath = target;
+		navigate(target, { replace });
 	}
 
-	function newServer() {
-		setView('servercreation');
+	function newServer(): void {
+		go('/servers/new', false);
 	}
 
 	function getStoredToken(): string | null {
@@ -94,18 +83,15 @@
 	}
 
 	onMount(() => {
-		view = getViewFromUrl();
-
-		const onPopState = () => {
-			view = getViewFromUrl();
-		};
-
-		window.addEventListener('popstate', onPopState);
+		currentPath = normalizePath(window.location.pathname);
+		const unlisten = listen(({ location }) => {
+			currentPath = normalizePath(location.pathname);
+		});
 
 		void (async () => {
 			const allowed = await isOnboardingAllowed();
 			if (allowed) {
-				setView('onboarding');
+				go('/onboarding');
 				initialized = true;
 				return;
 			}
@@ -113,19 +99,24 @@
 			const hadToken = !!getStoredToken();
 			const expired = await isTokenExpired();
 			if (!expired) {
-				setView('server');
+				if (PRIVATE_PATHS.has(currentPath)) {
+					initialized = true;
+					return;
+				}
+
+				go('/servers');
 			} else {
 				if (hadToken) {
 					toast.error('Session Expired. Please log in again.');
 				}
 				clearStoredToken();
-				setView('login');
+				go('/login');
 			}
 			initialized = true;
 		})();
 
 		return () => {
-			window.removeEventListener('popstate', onPopState);
+			unlisten();
 		};
 	});
 </script>
@@ -140,26 +131,47 @@
 
 {#if !initialized}
 	<div class="flex h-screen w-full items-center justify-center px-4"></div>
-{:else if view === 'server'}
-	<ServerView {newServer} />
-{:else if view === 'login'}
-	<div class="flex h-screen w-full items-center justify-center px-4">
-		<LoginView
-			onSuccess={() => {
-				setView('server', false);
-				toast.success('Login Successful!');
-			}}
-		/>
-	</div>
-{:else if view === 'servercreation'}
-	<ServerCreationView />
-{:else if view === 'onboarding'}
-	<div class="flex h-screen w-full items-center justify-center px-4">
-		<OnboardingView
-			onSuccess={() => {
-				setView('login');
-				toast.success('Registration Successful!');
-			}}
-		/>
-	</div>
+{:else}
+	<Router>
+		<Route path="/servers/new">
+			<ServerCreationView />
+		</Route>
+		<Route path="/servers">
+			<ServerView {newServer} />
+		</Route>
+		<Route path="/login">
+			<div class="flex h-screen w-full items-center justify-center px-4">
+				<LoginView
+					onSuccess={() => {
+						go('/servers', false);
+						toast.success('Login Successful!');
+					}}
+				/>
+			</div>
+		</Route>
+		<Route path="/onboarding">
+			<div class="flex h-screen w-full items-center justify-center px-4">
+				<OnboardingView
+					onSuccess={() => {
+						go('/login');
+						toast.success('Registration Successful!');
+					}}
+				/>
+			</div>
+		</Route>
+		<Route>
+			<div class="flex h-screen w-full items-center justify-center px-4">
+				{#if PUBLIC_PATHS.has(currentPath)}
+					<LoginView
+						onSuccess={() => {
+							go('/servers', false);
+							toast.success('Login Successful!');
+						}}
+					/>
+				{:else}
+					<div class="text-sm text-muted-foreground">Unknown route. Redirecting...</div>
+				{/if}
+			</div>
+		</Route>
+	</Router>
 {/if}

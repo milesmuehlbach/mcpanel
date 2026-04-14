@@ -6,6 +6,7 @@
       "name": "mcpanel",
       "dependencies": {
         "@tabler/icons-svelte": "^3.40.0",
+        "svelte5-router": "^3.1.0",
       },
       "devDependencies": {
         "@eslint/compat": "^2.0.2",
@@ -549,6 +550,8 @@
     "svelte-sonner": ["svelte-sonner@1.1.0", "", { "dependencies": { "runed": "^0.28.0" }, "peerDependencies": { "svelte": "^5.0.0" } }, "sha512-3lYM6ZIqWe+p9vwwWHGWP/ZdvHiUtzURsud2quIxivrX4rvpXh6i+geBGn0m3JS6KwW6W8VgbOl3xQMcDuh6gg=="],
 
     "svelte-toolbelt": ["svelte-toolbelt@0.10.6", "", { "dependencies": { "clsx": "^2.1.1", "runed": "^0.35.1", "style-to-object": "^1.0.8" }, "peerDependencies": { "svelte": "^5.30.2" } }, "sha512-YWuX+RE+CnWYx09yseAe4ZVMM7e7GRFZM6OYWpBKOb++s+SQ8RBIMMe+Bs/CznBMc0QPLjr+vDBxTAkozXsFXQ=="],
+
+    "svelte5-router": ["svelte5-router@3.1.0", "", { "peerDependencies": { "svelte": "^5.0.0" } }, "sha512-rBuFLm8AxnuBZX/RtZDIJbpOrWHvMmSAXvhNOr3zyI9PCTTfASKjkglLvdq7wPpzrc/7XTFzwxM+nHMe9gfgpw=="],
 
     "tabbable": ["tabbable@6.4.0", "", {}, "sha512-05PUHKSNE8ou2dwIxTngl4EzcnsCDZGJ/iCLtDflR/SHB/ny14rXc+qU5P4mG9JkusiV7EivzY9Mhm55AzAvCg=="],
 

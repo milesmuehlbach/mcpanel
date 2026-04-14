@@ -382,12 +382,14 @@
 		const installationData = {
 			server: {
 				component_uid: serverComponent.uid,
-				component_version: serverComponent.version
+				component_version: serverComponent.version,
+				hashes: serverComponent.hashes
 			},
 			runtime: runtimeComponent
 				? {
 						component_uid: runtimeComponent.uid,
-						component_version: runtimeComponent.version
+						component_version: runtimeComponent.version,
+						hashes: runtimeComponent.hashes
 					}
 				: null
 		};
