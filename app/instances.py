@@ -88,14 +88,14 @@ class Instance:
         self._arguments = list(DEFAULT_ARGUMENTS)
         self._persistence = False
 
-        self.set_defaults()
-        self.load_instance_config()
-        self._persistence = True
-
         self.process = None
         self.running = False
         self.bridge_thread = None
         self.console: list[ConsoleEntry] = [] # NOTE: log capture is super simple atm. not particularly robust. instead of capturing stdout in rt, maybe forward latest.log as it updates?
+
+        self.set_defaults()
+        self.load_instance_config()
+        self._persistence = True
 
     def set_defaults(self):
         now = _utcnow()
