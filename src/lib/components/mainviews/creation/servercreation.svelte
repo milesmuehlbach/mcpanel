@@ -11,6 +11,9 @@
 	import XCircleIcon from '@lucide/svelte/icons/x-circle';
 	import { navigate } from 'svelte5-router';
 	import { toast } from 'svelte-sonner';
+	import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+	import { Label } from '$lib/components/ui/label/index.ts';
+
 
 	const totalSteps = 3;
 	let step = $state(1);
@@ -21,7 +24,6 @@
 
 	let serverName = $state('');
 	let isCreatingInstance = $state(false);
-	let createdInstanceUuid = $state<string | null>(null);
 
 	type Hashes = {
 		md5: string | null;
@@ -54,6 +56,8 @@
 
 	let installationData = $state<InstallationData | null>(null);
 	let installItems = $state<InstallItem[]>([]);
+
+	let eulachecked = $state(false);
 
 	const canConfigureInstance = $derived(stepTwoComplete && !isInstalling);
 
@@ -420,13 +424,21 @@
 							<Input id="server-name" bind:value={serverName} placeholder="My Server" />
 						</Field.Field>
 					</Field.Set>
-
+					<div class="flex items-start gap-3">
+						<Checkbox id="terms-2" bind:checked={eulachecked} />
+						<div class="grid gap-2">
+							<Label for="terms-2">Agree to Minecraft EULA</Label>
+							<p class="text-muted-foreground text-sm">
+								By clicking this checkbox, you agree to the terms and conditions as outlined in the <a target="_blank" href="https://www.minecraft.net/en-us/eula" class="underline text-gray-50">Minecraft EULA</a>
+							</p>
+						</div>
+					</div>
 					<div class="flex flex-wrap gap-2 pt-2">
 						<Button
 							type="button"
 							class="w-full"
 							onclick={createInstance}
-							disabled={isCreatingInstance || !serverName.trim()}
+							disabled={isCreatingInstance || !serverName.trim() || !eulachecked}
 						>
 							{#if isCreatingInstance}
 								<Loader2Icon class="mr-2 size-4 animate-spin" />
