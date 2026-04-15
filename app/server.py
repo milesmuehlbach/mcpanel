@@ -1,17 +1,17 @@
-from pathlib import Path
-
 from fastapi import FastAPI, HTTPException as FastAPIHTTPException, Request
 from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api import api
+from app.paths import (
+    FRONTEND_APP_DIR,
+    FRONTEND_ASSETS_DIR,
+    FRONTEND_FAVICON_FILE,
+    FRONTEND_INDEX_FILE,
+)
 
 app = FastAPI(title="mcpanel")
-
-BUILD_DIR = Path("build")
-INDEX_FILE = BUILD_DIR / "index.html"
-FAVICON_FILE = BUILD_DIR / "assets" / "favicon.ico"
 
 
 @app.exception_handler(Exception)
@@ -38,23 +38,23 @@ async def http_exception_handler(request: Request, exception: Exception):
 
 app.include_router(api, prefix="/api")
 
-app.mount("/_app", StaticFiles(directory=BUILD_DIR / "_app"))
-app.mount("/assets", StaticFiles(directory=BUILD_DIR / "assets"))
+app.mount("/_app", StaticFiles(directory=FRONTEND_APP_DIR))
+app.mount("/assets", StaticFiles(directory=FRONTEND_ASSETS_DIR))
 
 
 @app.get("/")
 async def _root():
-    return FileResponse(INDEX_FILE)
+    return FileResponse(FRONTEND_INDEX_FILE)
 
 
 @app.get("/favicon.ico")
 async def _favicon():
-    if FAVICON_FILE.exists():
-        return FileResponse(FAVICON_FILE)
+    if FRONTEND_FAVICON_FILE.exists():
+        return FileResponse(FRONTEND_FAVICON_FILE)
 
     return Response(status_code=204)
 
 
 @app.get("/{path:path}")
 async def _spa(path: str):
-    return FileResponse(INDEX_FILE)
+    return FileResponse(FRONTEND_INDEX_FILE)
