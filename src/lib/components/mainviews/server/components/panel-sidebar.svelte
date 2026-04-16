@@ -2,14 +2,14 @@
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import ServerSelector from '$lib/components/mainviews/server/components/serverselection.svelte';
 	import SidebarFooter from '$lib/components/mainviews/server/components/sidebarfooter.svelte';
-	import SidebarItem from '$lib/components/mainviews/server/components/sidebaritem.svelte';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import { onMount } from 'svelte';
 	import type { Component } from 'svelte';
 	import type { IconProps } from '@lucide/svelte';
+	import { navigate } from 'svelte5-router';
+	import type { ServerSubview } from '$lib/components/mainviews/server/server-subroutes';
 	import Gauge from '@lucide/svelte/icons/gauge';
 	import Settings2 from '@lucide/svelte/icons/settings-2';
-	import ServerCog from '@lucide/svelte/icons/server-cog';
 	import Users from '@lucide/svelte/icons/users';
 	import SquareTerminal from '@lucide/svelte/icons/square-terminal';
 	import ScrollText from '@lucide/svelte/icons/scroll-text';
@@ -20,7 +20,10 @@
 	interface SidebarNavItem {
 		name: string;
 		icon: Component<IconProps>;
+		subview: ServerSubview;
 	}
+
+
 
 	let isAdminUser = $state(false);
 
@@ -59,34 +62,69 @@
 	});
 
 	const serverMenuItems: SidebarNavItem[] = [
-		{ name: 'Dashboard', icon: Gauge },
-		{ name: 'Properties', icon: Settings2 },
-		{ name: 'Mods', icon: Download },
-		{ name: 'Console', icon: SquareTerminal },
-		{ name: 'Server', icon: Server },
-		{ name: 'Files', icon: Folders },
-		{ name: 'Logs', icon: ScrollText }
+		{ name: 'Dashboard', icon: Gauge, subview: 'dashboard' },
+		{ name: 'Properties', icon: Settings2, subview: 'properties' },
+		{ name: 'Mods', icon: Download, subview: 'mods' },
+		{ name: 'Console', icon: SquareTerminal, subview: 'console' },
+		{ name: 'Server', icon: Server, subview: 'server' },
+		{ name: 'Files', icon: Folders, subview: 'files' },
+		{ name: 'Logs', icon: ScrollText, subview: 'logs' }
 	];
 
-	let { newServer = () => {} }: { newServer?: () => void } = $props();
+	let {
+		newServer = () => {},
+		activeSubview = 'dashboard'
+	}: {
+		newServer?: () => void;
+		activeSubview?: ServerSubview;
+	} = $props();
+
+	function goToSubview(subview: ServerSubview): void {
+		navigate(`/servers/${subview}`);
+	}
 </script>
 
 <Sidebar.Root collapsible="icon">
 	<Sidebar.Header>
 		<ServerSelector {newServer} />
 	</Sidebar.Header>
-    <Separator />
+	<Separator />
 	<Sidebar.Content>
-        <Sidebar.Menu class="mt-2">
+		<Sidebar.Menu class="mt-2">
 			{#each serverMenuItems as item (item.name)}
-				<SidebarItem name={item.name} icon={item.icon} />
+				{@const Icon = item.icon}
+				<Sidebar.MenuItem class="md-0.5 mt-0.5 mr-2 ml-2">
+					<Sidebar.MenuButton
+						isActive={activeSubview === item.subview}
+						onclick={() => goToSubview(item.subview)}
+					>
+						<Icon class="mr-2" />
+						{item.name}
+					</Sidebar.MenuButton>
+				</Sidebar.MenuItem>
 			{/each}
 		</Sidebar.Menu>
 		<div class="mt-auto">
 			<Sidebar.Menu>
 				{#if isAdminUser}
-                    <SidebarItem name="Users" icon={Users} />
-					<SidebarItem name="Settings" icon={ServerCog} />
+					<Sidebar.MenuItem class="md-0.5 mt-0.5 mr-2 ml-2">
+						<Sidebar.MenuButton
+							isActive={activeSubview === 'admin'}
+							onclick={() => goToSubview('admin')}
+						>
+							<Users class="mr-2" />
+							Admin
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+					<Sidebar.MenuItem class="md-0.5 mt-0.5 mr-2 ml-2">
+						<Sidebar.MenuButton
+							isActive={activeSubview === 'settings'}
+							onclick={() => goToSubview('settings')}
+						>
+							<Settings2 class="mr-2" />
+							Settings
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
 				{/if}
 			</Sidebar.Menu>
 		</div>

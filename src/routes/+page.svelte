@@ -1,5 +1,9 @@
 <script lang="ts">
 	import ServerView from '$lib/components/mainviews/server/serverview.svelte';
+	import {
+		isServerSubview,
+		type ServerSubview
+	} from '$lib/components/mainviews/server/server-subroutes';
 	import LoginView from '$lib/components/mainviews/login.svelte';
 	import OnboardingView from '$lib/components/mainviews/onboard.svelte';
 	import ServerCreationView from '$lib/components/mainviews/creation/servercreation.svelte';
@@ -27,6 +31,32 @@
 		const target = normalizePath(to);
 		currentPath = target;
 		navigate(target, { replace });
+	}
+
+	function getServerSubview(pathname: string): ServerSubview {
+		if (pathname === '/servers') {
+			return 'dashboard';
+		}
+
+		if (!pathname.startsWith('/servers/')) {
+			return 'dashboard';
+		}
+
+		const maybeSubview = pathname.slice('/servers/'.length);
+		return isServerSubview(maybeSubview) ? maybeSubview : 'dashboard';
+	}
+
+	function isPrivatePath(pathname: string): boolean {
+		if (PRIVATE_PATHS.has(pathname)) {
+			return true;
+		}
+
+		if (!pathname.startsWith('/servers/')) {
+			return false;
+		}
+
+		const maybeSubview = pathname.slice('/servers/'.length);
+		return isServerSubview(maybeSubview);
 	}
 
 	function newServer(): void {
@@ -99,7 +129,7 @@
 			const hadToken = !!getStoredToken();
 			const expired = await isTokenExpired();
 			if (!expired) {
-				if (PRIVATE_PATHS.has(currentPath)) {
+				if (isPrivatePath(currentPath)) {
 					initialized = true;
 					return;
 				}
@@ -137,7 +167,34 @@
 			<ServerCreationView />
 		</Route>
 		<Route path="/servers">
-			<ServerView {newServer} />
+			<ServerView {newServer} activeSubview="dashboard" />
+		</Route>
+		<Route path="/servers/dashboard">
+			<ServerView {newServer} activeSubview="dashboard" />
+		</Route>
+		<Route path="/servers/properties">
+			<ServerView {newServer} activeSubview="properties" />
+		</Route>
+		<Route path="/servers/mods">
+			<ServerView {newServer} activeSubview="mods" />
+		</Route>
+		<Route path="/servers/console">
+			<ServerView {newServer} activeSubview="console" />
+		</Route>
+		<Route path="/servers/server">
+			<ServerView {newServer} activeSubview="server" />
+		</Route>
+		<Route path="/servers/files">
+			<ServerView {newServer} activeSubview="files" />
+		</Route>
+		<Route path="/servers/logs">
+			<ServerView {newServer} activeSubview="logs" />
+		</Route>
+		<Route path="/servers/admin">
+			<ServerView {newServer} activeSubview="admin" />
+		</Route>
+		<Route path="/servers/settings">
+			<ServerView {newServer} activeSubview="settings" />
 		</Route>
 		<Route path="/login">
 			<div class="flex h-screen w-full items-center justify-center px-4">

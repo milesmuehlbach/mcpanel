@@ -11,9 +11,8 @@
 	import XCircleIcon from '@lucide/svelte/icons/x-circle';
 	import { navigate } from 'svelte5-router';
 	import { toast } from 'svelte-sonner';
-	import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { Label } from '$lib/components/ui/label/index.ts';
-
 
 	const totalSteps = 3;
 	let step = $state(1);
@@ -315,10 +314,10 @@
 			}
 
 			const data = await response.json();
-			createdInstanceUuid = data?.uuid ?? null;
+			const createdInstanceUuid = data?.uuid ?? null;
 			sessionStorage.removeItem('installationData');
 			toast.success('Instance created successfully.');
-			goToServers()
+			goToServers();
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Failed to create instance.';
 			toast.error(message);
@@ -428,8 +427,12 @@
 						<Checkbox id="terms-2" bind:checked={eulachecked} />
 						<div class="grid gap-2">
 							<Label for="terms-2">Agree to Minecraft EULA</Label>
-							<p class="text-muted-foreground text-sm">
-								By clicking this checkbox, you agree to the terms and conditions as outlined in the <a target="_blank" href="https://www.minecraft.net/en-us/eula" class="underline text-gray-50">Minecraft EULA</a>
+							<p class="text-sm text-muted-foreground">
+								By clicking this checkbox, you agree to the terms and conditions as outlined in the <a
+									target="_blank"
+									href="https://www.minecraft.net/en-us/eula"
+									class="text-gray-50 underline">Minecraft EULA</a
+								>
 							</p>
 						</div>
 					</div>
