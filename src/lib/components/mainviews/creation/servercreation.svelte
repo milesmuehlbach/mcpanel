@@ -279,6 +279,10 @@
 		navigate('/servers');
 	}
 
+	function goToServerDashboard(serverUuid: string): void {
+		navigate(`/servers/${serverUuid}/dashboard`);
+	}
+
 	async function createInstance(): Promise<void> {
 		if (
 			!installationData ||
@@ -317,7 +321,12 @@
 			const createdInstanceUuid = data?.uuid ?? null;
 			sessionStorage.removeItem('installationData');
 			toast.success('Instance created successfully.');
-			goToServers();
+
+			if (typeof createdInstanceUuid === 'string' && createdInstanceUuid.trim()) {
+				goToServerDashboard(createdInstanceUuid);
+			} else {
+				goToServers();
+			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Failed to create instance.';
 			toast.error(message);

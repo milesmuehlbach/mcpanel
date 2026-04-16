@@ -33,17 +33,8 @@
 		navigate(target, { replace });
 	}
 
-	function getServerSubview(pathname: string): ServerSubview {
-		if (pathname === '/servers') {
-			return 'dashboard';
-		}
-
-		if (!pathname.startsWith('/servers/')) {
-			return 'dashboard';
-		}
-
-		const maybeSubview = pathname.slice('/servers/'.length);
-		return isServerSubview(maybeSubview) ? maybeSubview : 'dashboard';
+	function normalizeServerSubview(value: string | undefined): ServerSubview {
+		return value && isServerSubview(value) ? value : 'dashboard';
 	}
 
 	function isPrivatePath(pathname: string): boolean {
@@ -55,8 +46,18 @@
 			return false;
 		}
 
-		const maybeSubview = pathname.slice('/servers/'.length);
-		return isServerSubview(maybeSubview);
+		const serverPath = pathname.slice('/servers/'.length);
+		const segments = serverPath.split('/').filter(Boolean);
+
+		if (segments.length === 1) {
+			return true;
+		}
+
+		if (segments.length === 2) {
+			return isServerSubview(segments[1]);
+		}
+
+		return false;
 	}
 
 	function newServer(): void {
@@ -166,35 +167,22 @@
 		<Route path="/servers/new">
 			<ServerCreationView />
 		</Route>
+		<Route path="/servers/:serverUuid/:subview">
+			{#snippet children(params)}
+				<ServerView
+					{newServer}
+					selectedServerUuid={params.serverUuid}
+					activeSubview={normalizeServerSubview(params.subview)}
+				/>
+			{/snippet}
+		</Route>
+		<Route path="/servers/:serverUuid">
+			{#snippet children(params)}
+				<ServerView {newServer} selectedServerUuid={params.serverUuid} activeSubview="dashboard" />
+			{/snippet}
+		</Route>
 		<Route path="/servers">
-			<ServerView {newServer} activeSubview="dashboard" />
-		</Route>
-		<Route path="/servers/dashboard">
-			<ServerView {newServer} activeSubview="dashboard" />
-		</Route>
-		<Route path="/servers/properties">
-			<ServerView {newServer} activeSubview="properties" />
-		</Route>
-		<Route path="/servers/mods">
-			<ServerView {newServer} activeSubview="mods" />
-		</Route>
-		<Route path="/servers/console">
-			<ServerView {newServer} activeSubview="console" />
-		</Route>
-		<Route path="/servers/server">
-			<ServerView {newServer} activeSubview="server" />
-		</Route>
-		<Route path="/servers/files">
-			<ServerView {newServer} activeSubview="files" />
-		</Route>
-		<Route path="/servers/logs">
-			<ServerView {newServer} activeSubview="logs" />
-		</Route>
-		<Route path="/servers/admin">
-			<ServerView {newServer} activeSubview="admin" />
-		</Route>
-		<Route path="/servers/settings">
-			<ServerView {newServer} activeSubview="settings" />
+			<ServerView {newServer} selectedServerUuid={null} activeSubview="dashboard" />
 		</Route>
 		<Route path="/login">
 			<div class="flex h-screen w-full items-center justify-center px-4">

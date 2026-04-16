@@ -7,7 +7,8 @@
 	import type { Component } from 'svelte';
 	import type { IconProps } from '@lucide/svelte';
 	import { navigate } from 'svelte5-router';
-	import type { ServerSubview } from '$lib/components/mainviews/server/server-subroutes';
+	import { type ServerSubview } from '$lib/components/mainviews/server/server-subroutes';
+	import { serverState } from '$lib/components/mainviews/server/server-state.svelte';
 	import Gauge from '@lucide/svelte/icons/gauge';
 	import Settings2 from '@lucide/svelte/icons/settings-2';
 	import Users from '@lucide/svelte/icons/users';
@@ -22,8 +23,6 @@
 		icon: Component<IconProps>;
 		subview: ServerSubview;
 	}
-
-
 
 	let isAdminUser = $state(false);
 
@@ -80,13 +79,18 @@
 	} = $props();
 
 	function goToSubview(subview: ServerSubview): void {
-		navigate(`/servers/${subview}`);
+		const serverUuid = serverState.selectedServerUuid;
+		if (!serverUuid) {
+			return;
+		}
+
+		navigate(`/servers/${serverUuid}/${subview}`);
 	}
 </script>
 
 <Sidebar.Root collapsible="icon">
 	<Sidebar.Header>
-		<ServerSelector {newServer} />
+		<ServerSelector {newServer} {activeSubview} />
 	</Sidebar.Header>
 	<Separator />
 	<Sidebar.Content>

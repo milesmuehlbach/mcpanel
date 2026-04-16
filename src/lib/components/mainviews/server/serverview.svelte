@@ -3,82 +3,43 @@
 	import AppSidebar from '$lib/components/mainviews/server/components/panel-sidebar.svelte';
 	import type { ServerSubview } from '$lib/components/mainviews/server/server-subroutes';
 	import { SERVER_SUBROUTE_LABELS } from '$lib/components/mainviews/server/server-subroutes';
+	import { serverState } from '$lib/components/mainviews/server/server-state.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { navigate } from 'svelte5-router';
 	import { onMount } from 'svelte';
 
 	let {
 		newServer = () => {},
-		activeSubview = 'dashboard'
+		activeSubview = 'dashboard',
+		selectedServerUuid = null
 	}: {
 		newServer?: () => void;
 		activeSubview?: ServerSubview;
+		selectedServerUuid?: string | null;
 	} = $props();
 
-	type ServerListItem = {
-		uuid: string;
-		name: string;
-	};
-
-	function parseServers(data: unknown): ServerListItem[] {
-		const rawInstances = Array.isArray(data)
-			? data
-			: data &&
-			typeof data === 'object' &&
-			Array.isArray((data as { instances?: unknown }).instances)
-				? (data as { instances: unknown[] }).instances
-				: [];
-
-		return rawInstances
-			.map((instance, index) => {
-				if (!instance || typeof instance !== 'object') {
-					return null;
-				}
-
-				const name = (instance as { name?: unknown }).name;
-				if (typeof name !== 'string' || !name.trim()) {
-					return null;
-				}
-
-				const uuid = (instance as { uuid?: unknown }).uuid;
-				return {
-					uuid: typeof uuid === 'string' && uuid.trim() ? uuid : `${index}-${name}`,
-					name
-				};
-			})
-			.filter((instance): instance is ServerListItem => instance !== null);
-	}
-
-	async function getServers(): Promise<ServerListItem[]> {
-		const token = sessionStorage.getItem('token');
-		if (!token) {
-			return [];
-		}
-
-		try {
-			const response = await fetch('/api/v1/instances/list', {
-				headers: {
-					Authorization: `Bearer ${token}`
-				}
-			});
-
-			if (!response.ok) {
-				return [];
-			}
-
-			const data = (await response.json()) as unknown;
-			return parseServers(data);
-		} catch (error) {
-			console.error('Failed to load servers:', error);
-			return [];
-		}
-	}
-
 	let subviewTitle = $derived(SERVER_SUBROUTE_LABELS[activeSubview]);
+	let servers = $derived(serverState.servers);
 
-	let servers = $state<ServerListItem[]>([]);
+	$effect(() => {
+		if (selectedServerUuid) {
+			serverState.selectedServerUuid = selectedServerUuid;
+		}
+	});
 
 	onMount(() => {
-		servers = getServers();
+		void (async () => {
+			await serverState.loadServers();
+
+			const canonicalServerUuid = serverState.selectedServerUuid;
+			if (!canonicalServerUuid) {
+				return;
+			}
+
+			if (selectedServerUuid !== canonicalServerUuid) {
+				navigate(`/servers/${canonicalServerUuid}/${activeSubview}`, { replace: true });
+			}
+		})();
 	});
 </script>
 

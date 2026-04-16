@@ -2,18 +2,18 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { useSidebar } from '$lib/components/ui/sidebar';
+	import { type ServerSubview } from '$lib/components/mainviews/server/server-subroutes';
+	import { serverState } from '$lib/components/mainviews/server/server-state.svelte';
+	import { navigate } from 'svelte5-router';
 	import { onMount } from 'svelte';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 
-	type ServerListItem = {
-		uuid: string;
-		name: string;
-	};
-
 	let {
-		newServer = () => {}
+		newServer = () => {},
+		activeSubview = 'dashboard'
 	}: {
 		newServer?: () => void;
+		activeSubview?: ServerSubview;
 	} = $props();
 
 	const sidebar = useSidebar();
@@ -29,80 +29,23 @@
 		return compact.slice(0, 2);
 	}
 
-	function parseServers(data: unknown): ServerListItem[] {
-		const rawInstances = Array.isArray(data)
-			? data
-			: data &&
-				  typeof data === 'object' &&
-				  Array.isArray((data as { instances?: unknown }).instances)
-				? (data as { instances: unknown[] }).instances
-				: [];
-
-		return rawInstances
-			.map((instance, index) => {
-				if (!instance || typeof instance !== 'object') {
-					return null;
-				}
-
-				const name = (instance as { name?: unknown }).name;
-				if (typeof name !== 'string' || !name.trim()) {
-					return null;
-				}
-
-				const uuid = (instance as { uuid?: unknown }).uuid;
-				return {
-					uuid: typeof uuid === 'string' && uuid.trim() ? uuid : `${index}-${name}`,
-					name
-				};
-			})
-			.filter((instance): instance is ServerListItem => instance !== null);
-	}
-
-	async function getServers(): Promise<ServerListItem[]> {
-		const token = sessionStorage.getItem('token');
-		if (!token) {
-			return [];
-		}
-
-		try {
-			const response = await fetch('/api/v1/instances/list', {
-				headers: {
-					Authorization: `Bearer ${token}`
-				}
-			});
-
-			if (!response.ok) {
-				return [];
-			}
-
-			const data = (await response.json()) as unknown;
-			return parseServers(data);
-		} catch (error) {
-			console.error('Failed to load servers:', error);
-			return [];
-		}
-	}
-
 	let collapseProgress = $derived(clamp(sidebar.progress));
 	let triggerShellStyle = $derived(
 		`width: calc(${(1 - collapseProgress).toFixed(4)} * 100% + ${collapseProgress.toFixed(4)} * 2rem) !important; height: ${lerp(3, 2, collapseProgress).toFixed(4)}rem !important; gap: ${lerp(0.5, 0, collapseProgress).toFixed(4)}rem; padding: ${lerp(0.5, 0, collapseProgress).toFixed(4)}rem ${lerp(0.625, 0, collapseProgress).toFixed(4)}rem !important; will-change: width, height, gap, padding;`
 	);
 
-	let servers = $state<ServerListItem[]>([]);
-	let selectedServerUuid = $state<string | null>(null);
+	let servers = $derived(serverState.servers);
 	let activeServerName = $derived(
-		servers.find((server) => server.uuid === selectedServerUuid)?.name ??
-			servers[0]?.name ??
-			'No servers'
+		serverState.selectedServer?.name ?? servers[0]?.name ?? 'No servers'
 	);
 
-	async function loadServers() {
-		servers = await getServers();
-		selectedServerUuid = servers[0]?.uuid ?? null;
+	function selectServer(uuid: string): void {
+		serverState.setSelectedServerUuid(uuid);
+		navigate(`/servers/${uuid}/${activeSubview}`);
 	}
 
 	onMount(() => {
-		void loadServers();
+		void serverState.loadServers();
 	});
 </script>
 
@@ -132,7 +75,9 @@
 						<div
 							class="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground"
 						>
-							<span class="text-xs leading-none font-bold">{getTitleFallback(activeServerName)}</span>
+							<span class="text-xs leading-none font-bold"
+								>{getTitleFallback(activeServerName)}</span
+							>
 						</div>
 						<span class="truncate font-medium">{activeServerName}</span>
 					</Sidebar.MenuButton>
@@ -146,7 +91,7 @@
 					<DropdownMenu.Label class="text-xs text-muted-foreground">Servers</DropdownMenu.Label>
 					{#each servers as server (server.uuid)}
 						<DropdownMenu.Item
-							onSelect={() => (selectedServerUuid = server.uuid)}
+							onSelect={() => selectServer(server.uuid)}
 							class="flex w-full items-center gap-2 p-2"
 						>
 							<div class="flex size-6 items-center justify-center rounded-md border">
