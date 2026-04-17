@@ -12,7 +12,7 @@
 	import { navigate } from 'svelte5-router';
 	import { toast } from 'svelte-sonner';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
-	import { Label } from '$lib/components/ui/label/index.ts';
+	import { Label } from '$lib/components/ui/label';
 
 	const totalSteps = 3;
 	let step = $state(1);

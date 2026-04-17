@@ -18,6 +18,148 @@
 	let controlsCardHeight = $state(0);
 	const controlsTopMargin = 24;
 
+	let consoleAbortController: AbortController | undefined;
+	let logs: string[] = $state([]);
+	let logContainer: HTMLDivElement | undefined = $state();
+	const MAX_LOG_LINES = 500;
+
+	function appendLog(line: string) {
+		logs.push(line);
+		if (logs.length > MAX_LOG_LINES) {
+			logs.shift();
+		}
+	}
+
+	function scrollToBottom() {
+		if (logContainer) {
+			logContainer.scrollTop = logContainer.scrollHeight;
+		}
+	}
+
+	$effect(() => {
+		if (logs.length > 0) {
+			scrollToBottom();
+		}
+	});
+
+	function teardownConsoleStream() {
+		if (consoleAbortController) {
+			consoleAbortController.abort();
+			consoleAbortController = undefined;
+		}
+	}
+
+	function parseEventDataValue(line: string): string {
+		const value = line.slice(5);
+		return value.startsWith(' ') ? value.slice(1) : value;
+	}
+
+	async function setupConsoleStream(uuid: string, token: string) {
+		teardownConsoleStream();
+
+		const abortController = new AbortController();
+		consoleAbortController = abortController;
+
+		try {
+			const response = await fetch(`/api/v1/instances/${uuid}/console`, {
+				method: 'GET',
+				headers: {
+					Authorization: `Bearer ${token}`,
+					Accept: 'text/event-stream'
+				},
+				signal: abortController.signal
+			});
+
+			if (!response.ok) {
+				console.error('Console stream request failed:', response.status, response.statusText);
+				if (response.status === 401) {
+					toast.error('Console stream unauthorized (401). Please log in again.');
+				}
+				return;
+			}
+
+			if (!response.body) {
+				console.error('Console stream did not return a readable body');
+				return;
+			}
+
+			const reader = response.body.getReader();
+			const decoder = new TextDecoder();
+			let buffer = '';
+			let eventData: string[] = [];
+
+			const flushEvent = () => {
+				if (eventData.length > 0) {
+					appendLog(eventData.join('\n'));
+					eventData = [];
+				}
+			};
+
+			try {
+				while (true) {
+					const { value, done } = await reader.read();
+					if (done) break;
+
+					buffer += decoder.decode(value, { stream: true });
+					const lines = buffer.split('\n');
+					buffer = lines.pop() ?? '';
+
+					for (const line of lines) {
+						const normalizedLine = line.replace(/\r$/, '');
+						if (normalizedLine === '') {
+							flushEvent();
+							continue;
+						}
+
+						if (normalizedLine.startsWith('data:')) {
+							eventData.push(parseEventDataValue(normalizedLine));
+						}
+					}
+				}
+
+				buffer += decoder.decode();
+				if (buffer.length > 0) {
+					const normalizedLine = buffer.replace(/\r$/, '');
+					if (normalizedLine.startsWith('data:')) {
+						eventData.push(parseEventDataValue(normalizedLine));
+					}
+				}
+				flushEvent();
+			} catch (error) {
+				if (!(error instanceof DOMException && error.name === 'AbortError')) {
+					console.error('Console stream failed while reading:', error);
+				}
+			} finally {
+				reader.releaseLock();
+			}
+		} catch (error) {
+			if (!(error instanceof DOMException && error.name === 'AbortError')) {
+				console.error('Console stream setup failed:', error);
+			}
+		} finally {
+			if (consoleAbortController === abortController) {
+				consoleAbortController = undefined;
+			}
+		}
+	}
+
+	$effect(() => {
+		const uuid = serverState.selectedServer?.uuid;
+		if (!uuid) return;
+
+		const token = sessionStorage.getItem('token');
+		if (!token) {
+			console.error('Missing auth token for console stream');
+			toast.error('Missing auth token. Please log in again.');
+			return;
+		}
+
+		void setupConsoleStream(uuid, token);
+		return () => {
+			teardownConsoleStream();
+		};
+	});
+
 	const trackCardHeight: Action<HTMLDivElement> = (node) => {
 		const updateHeight = () => {
 			controlsCardHeight = node.offsetHeight;
@@ -162,7 +304,6 @@
 	}
 
 	$effect(() => {
-		const uuid = serverState.selectedServer?.uuid;
 		untrack(() => {
 			void reloadServerState();
 		});
@@ -226,8 +367,13 @@
 				</Card.Header>
 				<Card.Content>
 					<div class="w-full border-t border-muted pt-4">
-						<div class="h-64 w-full overflow-y-auto rounded-md bg-muted p-4">
-							<p class="text-sm text-muted-foreground">Server logs will appear here.</p>
+						<div
+							bind:this={logContainer}
+							class="h-64 w-full overflow-y-auto rounded-md bg-muted p-4"
+						>
+							{#each logs as line, i (i)}
+								<p class="text-sm text-muted-foreground">{line}</p>
+							{/each}
 						</div>
 					</div>
 				</Card.Content>
