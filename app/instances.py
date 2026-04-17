@@ -44,6 +44,8 @@ DEFAULT_PARAMTERS = [
 JAVA_COMPONENT_UID_PATTERN = re.compile(r"^jre:(?!.*\.{2})[a-z.]+:[a-z0-9]+$")
 SERVER_COMPONENT_UID_PATTERN = re.compile(r"^server:[a-z]+:(?!.*\.{2})[a-z0-9.-]+$")
 
+InstanceStatus = Literal["starting", "running", "stopping", "stopped"]
+
 ConsoleStream = Literal["stdin", "stdout"]
 
 class ConsoleEntry(TypedDict):
@@ -89,8 +91,9 @@ class Instance:
         self._persistence = False
 
         self.process = None
-        self.running = False
         self.bridge_thread = None
+        self.running = False
+        self.status = InstanceStatus("stopped")
         self.console: list[ConsoleEntry] = [] # NOTE: log capture is super simple atm. not particularly robust. instead of capturing stdout in rt, maybe forward latest.log as it updates?
 
         self.set_defaults()
@@ -296,7 +299,7 @@ class Instance:
     def start(self):
         if self.running:
             raise RuntimeError(f"instance {self.uuid} is already running")
-
+        
         java_executable = self._get_java_executable()
         source_server_jar = self._get_server_jar()
         instance_server_jar = (self.path / source_server_jar.name).resolve()
@@ -325,6 +328,7 @@ class Instance:
             bufsize=1
         )
         self.running = True
+        self.status = InstanceStatus("starting")
         self.started_at = _utcnow()
         self.save_instance_config()
 
@@ -336,14 +340,18 @@ class Instance:
         # ideally the exposed API should be non-blocking
         if self.process and self.running:
             self.sendline("stop")
-            self.process.wait()
+            self.status = InstanceStatus("stopping")
+            self.process.wait() # synchronous
             self.running = False
+            self.status = InstanceStatus("stopped")
             # self.started_at = None # NOTE: i don't think that we should clear the timestamp state on stop bc it could be useful in future anyways
             # self.save_instance_config()
         
     def sendline(self, cmd: str):
         if self.process and self.running and self.process.stdin:
             command = cmd.rstrip("\r\n")
+            if command == "stop" or command == "restart":
+                self.status = InstanceStatus("stopping")
             self.process.stdin.write(command + "\n")
             self.process.stdin.flush()
             print(f"{SERVER_LABEL_COLOR}SERVER{SERVER_COLON_COLOR}:{COLOR_RESET}   >{command}{COLOR_RESET}")
@@ -358,9 +366,12 @@ class Instance:
                 break
 
             lineout = lineout.rstrip("\r\n")
+            if "Done" in lineout:
+                self.status = InstanceStatus("running")
             print(f"{SERVER_LABEL_COLOR}SERVER{SERVER_COLON_COLOR}:{COLOR_RESET}   {lineout}{COLOR_RESET}")
             self.console.append({"stream": "stdout", "data": lineout})
-            
+        
+        self.status = InstanceStatus("stopped")
         self.running = False
 
     def _get_java_executable(self) -> pathlib.Path:

@@ -534,7 +534,7 @@ async def _v1_instances_status(
         raise HTTPException(404, "instance not found")
 
     instance = instance_manager.get_instance(instance_uuid)
-    return {"message": "success", "status": "running" if instance.running else "stopped", "running": instance.running}
+    return {"message": "success", "status": instance.status, "running": instance.running}
 
 @V1.post(
     "/instances/{instance_uuid:uuid}/start",
