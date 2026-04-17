@@ -9,11 +9,12 @@
 	import { Tween } from 'svelte/motion';
 	import type { Action } from 'svelte/action';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { untrack } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 
 	let servername = $derived(serverState.selectedServer?.name ?? 'Unknown Server');
 
 	let serverStatus = $state(false);
+	let serverStateString = $state('stopped')
 	let viewportHeight = $state(0);
 	let controlsCardHeight = $state(0);
 	const controlsTopMargin = 24;
@@ -198,6 +199,7 @@
 		const selectedServer = serverState.selectedServer;
 		if (!selectedServer) {
 			serverStatus = false;
+			serverStateString = 'stopped';
 			return;
 		}
 
@@ -218,6 +220,7 @@
 
 			const data = await response.json();
 			serverStatus = data.running;
+			serverStateString = data.message;
 			await serverState.loadServers();
 		} catch (error) {
 			console.error('Error reloading server state:', error);
@@ -308,6 +311,10 @@
 			void reloadServerState();
 		});
 	});
+
+	onMount(() => {
+
+	})
 </script>
 
 <svelte:window bind:innerHeight={viewportHeight} />
