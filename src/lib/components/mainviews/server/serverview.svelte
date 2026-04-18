@@ -2,6 +2,7 @@
 	import NoServer from '$lib/components/mainviews/server/components/noserver.svelte';
 	import AppSidebar from '$lib/components/mainviews/server/components/panel-sidebar.svelte';
 	import Dashboard from '$lib/components/mainviews/server/components/serversubviews/dashboard.svelte';
+	import Console from '$lib/components/mainviews/server/components/serversubviews/console.svelte'
 	import type { ServerSubview } from '$lib/components/mainviews/server/server-subroutes';
 	import { SERVER_SUBROUTE_LABELS } from '$lib/components/mainviews/server/server-subroutes';
 	import { serverState } from '$lib/components/mainviews/server/server-state.svelte';
@@ -51,6 +52,8 @@
 			<NoServer {newServer} />
 		{:else if activeSubview === 'dashboard'}
 			<Dashboard />
+		{:else if activeSubview === 'console'}
+			<Console/>
 		{:else}
 			<div class="flex h-full w-full items-center justify-center p-6">
 				<div class="text-center">
