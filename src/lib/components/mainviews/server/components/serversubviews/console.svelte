@@ -6,10 +6,58 @@
 	import * as Card from '$lib/components/ui/card';
 	import SendHorizontal from '@lucide/svelte/icons/send-horizontal';
 	import type { Action } from 'svelte/action';
+	import { onMount } from 'svelte';
+	import Circle from '@lucide/svelte/icons/circle';
+	import { Spinner } from '$lib/components/ui/spinner';
+	import { Badge } from '$lib/components/ui/badge';
 
 	let viewportHeight = $state(0);
 	let consoleCardHeight = $state(0);
 	const consoleTopMargin = 24;
+
+	let serverStatus = $state(false)
+	let serverStateString = $state('stopped')
+
+	onMount(() => {
+		const interval = setInterval(reloadServerState, 1000);
+		return () => {
+			clearInterval(interval);
+		};
+	});
+
+	async function reloadServerState(): Promise<void> {
+		const selectedServer = serverState.selectedServer;
+		if (!selectedServer) {
+			serverStatus = false;
+			serverStateString = 'stopped';
+			return;
+		}
+
+		const token = sessionStorage.getItem('token');
+		try {
+			const response = await fetch(`/api/v1/instances/${selectedServer.uuid}/status`, {
+				method: 'GET',
+				headers: {
+					Authorization: `Bearer ${token}`
+				}
+			});
+
+			if (!response.ok) {
+				console.error('Failed to reload server state:', response.statusText);
+				toast.error('Failed to reload server state: ' + response.statusText);
+				return;
+			}
+
+			const data = await response.json();
+			serverStatus = data.running;
+			serverStateString = data.status;
+			await serverState.loadServers();
+		} catch (error) {
+			console.error('Error reloading server state:', error);
+			toast.error('Error reloading server state: ' + error);
+		}
+	}
+
 
 	const trackCardHeight: Action<HTMLDivElement> = (node) => {
 		const updateHeight = () => {
@@ -220,6 +268,18 @@
 			<Card.Root class="w-full">
 				<Card.Header class="space-y-2">
 					<Card.Title class="text-2xl font-semibold tracking-tight">Console</Card.Title>
+					<Badge variant="secondary" class="flex items-center gap-1.5">
+						{#if serverStateString === 'running' || serverStateString === 'stopped'}
+							<Circle
+								fill={serverStatus ? 'green' : 'red'}
+								color={serverStatus ? 'green' : 'red'}
+								class="size-2"
+							/>
+						{:else}
+							<Spinner class="size-2" />
+						{/if}
+						{serverStateString.charAt(0).toUpperCase() + serverStateString.slice(1)}
+					</Badge>
 				</Card.Header>
 				<Card.Content>
 					<div class="w-full border-t border-muted pt-4">
@@ -243,8 +303,9 @@
 							bind:value={command}
 							placeholder="Enter command..."
 							class="h-10 flex-1 font-mono"
+							disabled={!serverStatus}
 						/>
-						<Button type="submit" variant="outline" size="icon" aria-label="Send command">
+						<Button type="submit" variant="outline" size="icon" aria-label="Send command" disabled={!serverStatus}>
 							<SendHorizontal class="size-4" />
 						</Button>
 					</form>
