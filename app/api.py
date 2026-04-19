@@ -351,6 +351,38 @@ async def _v1_components_list(
             raise HTTPException(400, "invalid component type")
 
 @V1.get(
+    "/components/details",
+    dependencies=[Depends(require_permission("components.list_components"))]
+)
+async def _v1_components_details(
+    uid: str,
+):
+    # TODO: query and cache available components on init
+
+    normalized_uid = uid.strip()
+    component_type = normalized_uid.split(":", 1)[0]
+    match component_type:
+        case "jre":
+            components = java.get_available_runtimes()
+        case "server":
+            components = server.get_available_versions()
+        case _:
+            raise HTTPException(400, "invalid component type")
+
+    component = next(
+        (
+            entry
+            for entry in components
+            if isinstance(entry, dict) and isinstance(entry.get("uid"), str) and entry.get("uid") == normalized_uid
+        ),
+        None,
+    )
+    if component is None:
+        raise HTTPException(404, "component not found")
+
+    return {"message": "success", "component": component}
+
+@V1.get(
     "/components/get_recommended_jre",
     dependencies=[Depends(require_permission("components.list_components"))]
 )
