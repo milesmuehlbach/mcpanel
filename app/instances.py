@@ -86,6 +86,8 @@ class Instance:
         self._name = ""
         self._jar = None
         self._java = None
+        self._server_uid = None
+        self._java_uid = None
         self._memory = DEFAULT_MB
         self._arguments = list(DEFAULT_ARGUMENTS)
         self._persistence = False
@@ -106,6 +108,8 @@ class Instance:
         self._name = f"My Instance {self.uuid.hex[:8]}"
         self._jar = None
         self._java = None
+        self._server_uid = None
+        self._java_uid = None
         self._memory = DEFAULT_MB
         self._arguments = list(DEFAULT_ARGUMENTS)
 
@@ -121,6 +125,10 @@ class Instance:
             "running": self.running,
             "jar": self.jar,
             "java": self.java,
+            "components": {
+                "server_uid": self._server_uid,
+                "java_uid": self._java_uid
+            },
             "memory": self.memory,
             "arguments": list(self.arguments),
             "created_at": _to_epoch_seconds(self.created_at),
@@ -220,6 +228,24 @@ class Instance:
                     if java is None or isinstance(java, str):
                         self._java = java
 
+                    components = config.get("components")
+                    if isinstance(components, dict):
+                        server_uid = components.get("server_uid")
+                        if isinstance(server_uid, str) and SERVER_COMPONENT_UID_PATTERN.fullmatch(server_uid):
+                            self._server_uid = server_uid
+
+                        java_uid = components.get("java_uid")
+                        if isinstance(java_uid, str) and JAVA_COMPONENT_UID_PATTERN.fullmatch(java_uid):
+                            self._java_uid = java_uid
+
+                    if self._server_uid is None and isinstance(self._jar, str) and self._jar.endswith(".jar"):
+                        inferred_server_uid = self._jar[:-4].replace("_", ":")
+                        if SERVER_COMPONENT_UID_PATTERN.fullmatch(inferred_server_uid):
+                            self._server_uid = inferred_server_uid
+
+                    if self._java_uid is None and isinstance(self._java, str) and JAVA_COMPONENT_UID_PATTERN.fullmatch(self._java):
+                        self._java_uid = self._java
+
                     memory = config.get("memory")
                     if isinstance(memory, int) and not isinstance(memory, bool) and memory > 0:
                         self._memory = memory
@@ -259,6 +285,8 @@ class Instance:
             instance.memory = memory
         if arguments is not None:
             instance.arguments = arguments
+        instance._server_uid = server_uid
+        instance._java_uid = java_uid
         instance.jar = f"{server_uid.replace(':', '_')}.jar"
         instance.java = java_uid
 
@@ -375,10 +403,11 @@ class Instance:
         self.running = False
 
     def _get_java_executable(self) -> pathlib.Path:
-        if not isinstance(self.java, str) or not JAVA_COMPONENT_UID_PATTERN.fullmatch(self.java):
-            raise ValueError(f"invalid java uid format: {self.java}")
+        java_uid = self._java_uid
+        if not isinstance(java_uid, str) or not JAVA_COMPONENT_UID_PATTERN.fullmatch(java_uid):
+            raise ValueError(f"invalid java uid format: {java_uid}")
 
-        java_parts = self.java.split(":")
+        java_parts = java_uid.split(":")
 
         java_executable = (self.base_path / pathlib.Path(*java_parts) / "bin" / ("java.exe" if platform.system() == "Windows" else "java")).resolve()
         if self.base_path not in java_executable.parents:
@@ -388,16 +417,13 @@ class Instance:
         return java_executable
     
     def _get_server_jar(self) -> pathlib.Path:
-        if not isinstance(self.jar, str) or not self.jar.endswith(".jar"):
-            raise ValueError("server jar is not set")
-
-        server_uid = self.jar[:-4].replace("_", ":")
+        server_uid = self._server_uid
+        if not isinstance(server_uid, str):
+            raise ValueError("server uid is not set")
         if not SERVER_COMPONENT_UID_PATTERN.fullmatch(server_uid):
             raise ValueError(f"invalid server uid format: {server_uid}")
 
         jar_name = f"{server_uid.replace(':', '_')}.jar"
-        if self.jar != jar_name:
-            raise ValueError(f"invalid server jar filename: {self.jar}")
 
         jar_root = (self.base_path / "jar").resolve()
         server_jar = (jar_root / jar_name).resolve()
