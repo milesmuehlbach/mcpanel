@@ -8,9 +8,7 @@ COPY . .
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 RUN uv sync --locked
-RUN apt-get update && apt-get install -y curl
-RUN curl -fsSL https://nodesource.com | bash -
-RUN apt-get install -y nodejs npm
+RUN apt-get update && apt-get install -y curl nodejs npm
 
 RUN npm install && npm run build
 
