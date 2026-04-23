@@ -15,8 +15,8 @@
 	let consoleCardHeight = $state(0);
 	const consoleTopMargin = 24;
 
-	let serverStatus = $state(false)
-	let serverStateString = $state('stopped')
+	let serverStatus = $state(false);
+	let serverStateString = $state('stopped');
 
 	onMount(() => {
 		const interval = setInterval(reloadServerState, 1000);
@@ -58,7 +58,6 @@
 		}
 	}
 
-
 	const trackCardHeight: Action<HTMLDivElement> = (node) => {
 		const updateHeight = () => {
 			consoleCardHeight = node.offsetHeight;
@@ -80,9 +79,39 @@
 	);
 
 	let consoleAbortController: AbortController | undefined;
-	let logs: string[] = $state([]);
+	type LogSegment = {
+		text: string;
+		style: string;
+	};
+
+	type ParsedLogLine = LogSegment[];
+
+	let logs: ParsedLogLine[] = $state([]);
 	let logContainer: HTMLDivElement | undefined = $state();
 	const MAX_LOG_LINES = 500;
+	const ANSI_ESCAPE_PREFIX = '\u001b[';
+
+	const ANSI_BASE_COLORS = [
+		'#000000',
+		'#800000',
+		'#008000',
+		'#808000',
+		'#000080',
+		'#800080',
+		'#008080',
+		'#c0c0c0'
+	] as const;
+
+	const ANSI_BRIGHT_COLORS = [
+		'#808080',
+		'#ff0000',
+		'#00ff00',
+		'#ffff00',
+		'#0000ff',
+		'#ff00ff',
+		'#00ffff',
+		'#ffffff'
+	] as const;
 
 	let command: string = $state('');
 
@@ -120,22 +149,261 @@
 		}
 	}
 
+	type AnsiStyleState = {
+		bold: boolean;
+		italic: boolean;
+		underline: boolean;
+		fg?: string;
+		bg?: string;
+	};
+
+	function createDefaultStyleState(): AnsiStyleState {
+		return {
+			bold: false,
+			italic: false,
+			underline: false,
+			fg: undefined,
+			bg: undefined
+		};
+	}
+
+	function clampColorByte(value: number): number {
+		return Math.max(0, Math.min(255, value));
+	}
+
+	function ansi256ToCssColor(code: number): string {
+		const colorCode = clampColorByte(code);
+
+		if (colorCode < 8) {
+			return ANSI_BASE_COLORS[colorCode];
+		}
+
+		if (colorCode < 16) {
+			return ANSI_BRIGHT_COLORS[colorCode - 8];
+		}
+
+		if (colorCode < 232) {
+			const index = colorCode - 16;
+			const r = Math.floor(index / 36);
+			const g = Math.floor((index % 36) / 6);
+			const b = index % 6;
+			const levels = [0, 95, 135, 175, 215, 255];
+			return `rgb(${levels[r]}, ${levels[g]}, ${levels[b]})`;
+		}
+
+		const gray = 8 + (colorCode - 232) * 10;
+		return `rgb(${gray}, ${gray}, ${gray})`;
+	}
+
+	function styleStateToCss(state: AnsiStyleState): string {
+		const rules: string[] = [];
+
+		if (state.bold) {
+			rules.push('font-weight: 700');
+		}
+
+		if (state.italic) {
+			rules.push('font-style: italic');
+		}
+
+		if (state.underline) {
+			rules.push('text-decoration: underline');
+		}
+
+		if (state.fg) {
+			rules.push(`color: ${state.fg}`);
+		}
+
+		if (state.bg) {
+			rules.push(`background-color: ${state.bg}`);
+		}
+
+		return rules.join('; ');
+	}
+
+	function applySgrCodes(codes: number[], state: AnsiStyleState): void {
+		for (let i = 0; i < codes.length; i++) {
+			const code = codes[i];
+
+			if (code === 0) {
+				state.bold = false;
+				state.italic = false;
+				state.underline = false;
+				state.fg = undefined;
+				state.bg = undefined;
+				continue;
+			}
+
+			if (code === 1) {
+				state.bold = true;
+				continue;
+			}
+
+			if (code === 22) {
+				state.bold = false;
+				continue;
+			}
+
+			if (code === 3) {
+				state.italic = true;
+				continue;
+			}
+
+			if (code === 23) {
+				state.italic = false;
+				continue;
+			}
+
+			if (code === 4) {
+				state.underline = true;
+				continue;
+			}
+
+			if (code === 24) {
+				state.underline = false;
+				continue;
+			}
+
+			if (code >= 30 && code <= 37) {
+				state.fg = ANSI_BASE_COLORS[code - 30];
+				continue;
+			}
+
+			if (code >= 90 && code <= 97) {
+				state.fg = ANSI_BRIGHT_COLORS[code - 90];
+				continue;
+			}
+
+			if (code === 39) {
+				state.fg = undefined;
+				continue;
+			}
+
+			if (code >= 40 && code <= 47) {
+				state.bg = ANSI_BASE_COLORS[code - 40];
+				continue;
+			}
+
+			if (code >= 100 && code <= 107) {
+				state.bg = ANSI_BRIGHT_COLORS[code - 100];
+				continue;
+			}
+
+			if (code === 49) {
+				state.bg = undefined;
+				continue;
+			}
+
+			if (code === 38 || code === 48) {
+				const isForeground = code === 38;
+				const mode = codes[i + 1];
+
+				if (mode === 5 && typeof codes[i + 2] === 'number') {
+					const color = ansi256ToCssColor(codes[i + 2]);
+					if (isForeground) {
+						state.fg = color;
+					} else {
+						state.bg = color;
+					}
+					i += 2;
+					continue;
+				}
+
+				if (
+					mode === 2 &&
+					typeof codes[i + 2] === 'number' &&
+					typeof codes[i + 3] === 'number' &&
+					typeof codes[i + 4] === 'number'
+				) {
+					const r = clampColorByte(codes[i + 2]);
+					const g = clampColorByte(codes[i + 3]);
+					const b = clampColorByte(codes[i + 4]);
+					const color = `rgb(${r}, ${g}, ${b})`;
+
+					if (isForeground) {
+						state.fg = color;
+					} else {
+						state.bg = color;
+					}
+					i += 4;
+				}
+			}
+		}
+	}
+
+	function parseAnsiLine(line: string): ParsedLogLine {
+		const segments: ParsedLogLine = [];
+		const style = createDefaultStyleState();
+		let start = 0;
+
+		const pushSegment = (text: string) => {
+			if (!text) {
+				return;
+			}
+
+			const segmentStyle = styleStateToCss(style);
+			const previous = segments[segments.length - 1];
+			if (previous && previous.style === segmentStyle) {
+				previous.text += text;
+				return;
+			}
+
+			segments.push({
+				text,
+				style: segmentStyle
+			});
+		};
+
+		while (start < line.length) {
+			const escapeIndex = line.indexOf(ANSI_ESCAPE_PREFIX, start);
+			if (escapeIndex === -1) {
+				break;
+			}
+
+			pushSegment(line.slice(start, escapeIndex));
+
+			const sequenceStart = escapeIndex + ANSI_ESCAPE_PREFIX.length;
+			const sequenceEnd = line.indexOf('m', sequenceStart);
+			if (sequenceEnd === -1) {
+				start = escapeIndex;
+				break;
+			}
+
+			const sequence = line.slice(sequenceStart, sequenceEnd).trim();
+			const codes =
+				sequence === ''
+					? [0]
+					: sequence
+							.split(';')
+							.map((part) => Number.parseInt(part, 10))
+							.filter((code) => Number.isFinite(code));
+
+			applySgrCodes(codes, style);
+			start = sequenceEnd + 1;
+		}
+
+		pushSegment(line.slice(start));
+
+		if (segments.length === 0) {
+			segments.push({
+				text: '',
+				style: ''
+			});
+		}
+
+		return segments;
+	}
+
 	function appendLog(line: string) {
-		logs.push(line);
+		logs.push(parseAnsiLine(line));
 		if (logs.length > MAX_LOG_LINES) {
 			logs.shift();
 		}
 	}
 
-	function scrollToBottom() {
-		if (logContainer) {
-			logContainer.scrollTop = logContainer.scrollHeight;
-		}
-	}
-
 	$effect(() => {
-		if (logs.length > 0) {
-			scrollToBottom();
+		if (logs.length > 0 && logContainer) {
+			logContainer.scrollTop = logContainer.scrollHeight;
 		}
 	});
 
@@ -291,7 +559,11 @@
 								<p class="text-muted-foreground/80">Waiting for console output...</p>
 							{:else}
 								{#each logs as line, i (i)}
-									<p class="break-words whitespace-pre-wrap text-foreground/90">{line}</p>
+									<p class="break-words whitespace-pre-wrap text-foreground/90">
+										{#each line as segment, j (`${i}-${j}`)}
+											<span style={segment.style}>{segment.text}</span>
+										{/each}
+									</p>
 								{/each}
 							{/if}
 						</div>
@@ -303,9 +575,15 @@
 							bind:value={command}
 							placeholder="Enter command..."
 							class="h-10 flex-1 font-mono"
-							disabled={!serverStatus}
+							disabled={serverStateString !== 'running'}
 						/>
-						<Button type="submit" variant="outline" size="icon" aria-label="Send command" disabled={!serverStatus}>
+						<Button
+							type="submit"
+							variant="outline"
+							size="icon"
+							aria-label="Send command"
+							disabled={serverStateString !== 'running'}
+						>
 							<SendHorizontal class="size-4" />
 						</Button>
 					</form>
