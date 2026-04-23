@@ -1,0 +1,7 @@
+.venv/
+.vscode/
+minecraft/
+build/
+.opencode/
+.idea/
+node_modules/
