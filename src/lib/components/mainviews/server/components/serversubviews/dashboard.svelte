@@ -4,10 +4,10 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Badge } from '$lib/components/ui/badge';
 	import Circle from '@lucide/svelte/icons/circle';
-	import Terminal from '@lucide/svelte/icons/terminal'
+	import Terminal from '@lucide/svelte/icons/terminal';
 	import { toast } from 'svelte-sonner';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
-	import { onMount, untrack } from 'svelte';
+	import { onMount } from 'svelte';
 	import { navigate } from 'svelte5-router';
 
 	let servername = $derived(serverState.selectedServer?.name ?? 'Unknown Server');
@@ -20,8 +20,77 @@
 	let logContainer: HTMLDivElement | undefined = $state();
 	const MAX_LOG_LINES = 500;
 
+	let prettyVersion = $state('');
+	let prettySoftware = $state('');
+	let lastLoadedUuid: string | null = null;
+
+	async function loadInstanceDetails(): Promise<void> {
+		const selectedServer = serverState.selectedServer;
+		if (!selectedServer) {
+			prettyVersion = '';
+			prettySoftware = '';
+			return;
+		}
+
+		try {
+			const response1 = await fetch(`/api/v1/instances/${selectedServer.uuid}/details`, {
+				headers: {
+					Authorization: `Bearer ${sessionStorage.getItem('token')}`
+				}
+			});
+
+			if (!response1.ok) {
+				console.error('Failed to load instance details:', response1.statusText);
+				return;
+			}
+
+			const data1 = await response1.json();
+
+			const servercomponent = data1.instance.components.server_uid;
+
+			const response2 = await fetch(`/api/v1/components/details?uid=${servercomponent}`, {
+				headers: {
+					Authorization: `Bearer ${sessionStorage.getItem('token')}`
+				}
+			});
+
+			if (!response2.ok) {
+				console.error('Failed to load component details:', response2.statusText);
+				prettyVersion = '';
+				prettySoftware = '';
+				return;
+			}
+
+			const data2 = await response2.json();
+
+			prettyVersion = data2.component.display_version;
+			if (data2.component.display_component === 'Mojang') {
+				prettySoftware = 'Vanilla';
+			} else {
+				prettySoftware = data2.component.display_component;
+			}
+
+			return;
+		} catch (error) {
+			prettyVersion = '';
+			prettySoftware = '';
+			console.error(error);
+			toast.error(
+				'Failed to load instance details: ' +
+					(error instanceof Error ? error.message : String(error))
+			);
+		}
+	}
+
 	onMount(() => {
-		const interval = setInterval(reloadServerState, 1000);
+		lastLoadedUuid = serverState.selectedServerUuid;
+		void loadInstanceDetails();
+		void reloadServerState();
+
+		const interval = setInterval(() => {
+			void reloadServerState();
+		}, 1000);
+
 		return () => {
 			clearInterval(interval);
 		};
@@ -197,7 +266,9 @@
 			await serverState.loadServers();
 		} catch (error) {
 			console.error('Error reloading server state:', error);
-			toast.error('Error reloading server state: ' + error);
+			toast.error(
+				'Error reloading server state: ' + (error instanceof Error ? error.message : String(error))
+			);
 		}
 	}
 
@@ -223,7 +294,9 @@
 			await reloadServerState();
 		} catch (error) {
 			console.error('Error restarting server:', error);
-			toast.error('Error restarting server: ' + error);
+			toast.error(
+				'Error restarting server: ' + (error instanceof Error ? error.message : String(error))
+			);
 		}
 	}
 
@@ -249,7 +322,9 @@
 			await reloadServerState();
 		} catch (error) {
 			console.error('Error stopping server:', error);
-			toast.error('Error stopping server: ' + error);
+			toast.error(
+				'Error stopping server: ' + (error instanceof Error ? error.message : String(error))
+			);
 		}
 	}
 
@@ -281,14 +356,21 @@
 			await reloadServerState();
 		} catch (error) {
 			console.error('Error starting server:', error);
-			toast.error('Error starting server: ' + error);
+			toast.error(
+				'Error starting server: ' + (error instanceof Error ? error.message : String(error))
+			);
 		}
 	}
 
 	$effect(() => {
-		untrack(() => {
-			void reloadServerState();
-		});
+		const selectedUuid = serverState.selectedServerUuid;
+		if (selectedUuid === lastLoadedUuid) {
+			return;
+		}
+
+		lastLoadedUuid = selectedUuid;
+		void loadInstanceDetails();
+		void reloadServerState();
 	});
 </script>
 
@@ -313,8 +395,18 @@
 							{/if}
 							{serverStateString.charAt(0).toUpperCase() + serverStateString.slice(1)}
 						</Badge>
-						<Badge variant="secondary">26.1.2</Badge>
-						<Badge variant="secondary">Paper</Badge>
+						<Badge variant="secondary" style={prettySoftware === '' ? 'display: none;' : ''}
+							>{prettySoftware}</Badge
+						>
+						<Badge variant="secondary" style={prettyVersion === '' ? 'display: none;' : ''}
+							>{prettyVersion}</Badge
+						>
+						{#if prettySoftware === ''}
+							<Badge variant="secondary"><Spinner /></Badge>
+						{/if}
+						{#if prettyVersion === ''}
+							<Badge variant="secondary"><Spinner /></Badge>
+						{/if}
 					</Card.Description>
 				</Card.Header>
 				<Card.Content>
