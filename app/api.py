@@ -373,12 +373,19 @@ async def _v1_components_details(
         (
             entry
             for entry in components
-            if isinstance(entry, dict) and isinstance(entry.get("uid"), str) and entry.get("uid") == normalized_uid
+            if isinstance(entry, dict) and isinstance(entry.get("uid"), str) and entry.get("uid").startswith(
+                normalized_uid if not normalized_uid.startswith("server:paper:") else "-".join(normalized_uid.split("-")[:-1])
+            )
         ),
         None,
     )
     if component is None:
         raise HTTPException(404, "component not found")
+    
+    # visual fix for paper build numbers because we couldnt care less
+    if component["component"] == "paper":
+        component["display_version"] = component["display_version"].split(" (build ")[0]
+        component["display_name"] = component["display_name"].split(" (build ")[0]
 
     return {"message": "success", "component": component}
 
