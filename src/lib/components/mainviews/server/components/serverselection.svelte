@@ -4,6 +4,9 @@
 	import { useSidebar } from '$lib/components/ui/sidebar';
 	import { type ServerSubview } from '$lib/components/mainviews/server/server-subroutes';
 	import { serverState } from '$lib/components/mainviews/server/server-state.svelte';
+	import { Badge } from '$lib/components/ui/badge';
+	import Circle from '@lucide/svelte/icons/circle';
+	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import { navigate } from 'svelte5-router';
 	import { onMount } from 'svelte';
 	import PlusIcon from '@lucide/svelte/icons/plus';
@@ -38,6 +41,12 @@
 	let activeServerName = $derived(
 		serverState.selectedServer?.name ?? servers[0]?.name ?? 'No servers'
 	);
+	let activeServerStatus = $derived(serverState.activeServerStatus);
+	let activeServerRunning = $derived(serverState.activeServerRunning);
+	let activeServerPrettySoftware = $derived(serverState.activeServerPrettySoftware);
+	let activeServerPrettyVersion = $derived(serverState.activeServerPrettyVersion);
+	let showTriggerMeta = $derived(collapseProgress < 0.45);
+	let showTriggerStatus = $derived(collapseProgress < 0.9);
 
 	function selectServer(uuid: string): void {
 		serverState.setSelectedServerUuid(uuid);
@@ -46,6 +55,12 @@
 
 	onMount(() => {
 		void serverState.loadServers();
+		void serverState.refreshActiveServerState({ includeDetails: true, forceDetails: true });
+		const detachPolling = serverState.attachActiveServerPolling();
+
+		return () => {
+			detachPolling();
+		};
 	});
 </script>
 
@@ -79,8 +94,40 @@
 								>{getTitleFallback(activeServerName)}</span
 							>
 						</div>
-						<span class="truncate font-medium">{activeServerName}</span>
-					</Sidebar.MenuButton>
+						<div class="flex min-w-0 flex-1 flex-col items-start justify-center gap-1 text-left">
+							<span class="w-full truncate leading-tight font-medium">{activeServerName}</span>
+
+						{#if showTriggerStatus}
+							<div class="flex flex-wrap items-center gap-1.5">
+								<Badge variant="secondary" class="flex items-center gap-1.5 text-[10px] leading-none">
+									{#if activeServerStatus === 'running' || activeServerStatus === 'stopped'}
+										<Circle
+											fill={activeServerRunning ? 'green' : 'red'}
+											color={activeServerRunning ? 'green' : 'red'}
+											class="size-2"
+										/>
+									{:else}
+										<Spinner class="size-2" />
+									{/if}
+									{activeServerStatus.charAt(0).toUpperCase() + activeServerStatus.slice(1)}
+								</Badge>
+
+								{#if showTriggerMeta}
+									{#if activeServerPrettySoftware !== ''}
+										<Badge variant="secondary" class="text-[10px] leading-none">
+											{activeServerPrettySoftware}
+										</Badge>
+									{/if}
+									{#if activeServerPrettyVersion !== ''}
+										<Badge variant="secondary" class="text-[10px] leading-none">
+											{activeServerPrettyVersion}
+										</Badge>
+									{/if}
+								{/if}
+							</div>
+						{/if}
+						</div>
+                    </Sidebar.MenuButton>
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content
 					class="w-(--bits-dropdown-menu-anchor-width) min-w-56 rounded-lg"

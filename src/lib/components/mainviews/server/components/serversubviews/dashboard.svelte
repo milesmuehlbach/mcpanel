@@ -11,88 +11,23 @@
 	import { navigate } from 'svelte5-router';
 
 	let servername = $derived(serverState.selectedServer?.name ?? 'Unknown Server');
-
-	let serverStatus = $state(false);
-	let serverStateString = $state('stopped');
+	let serverStatus = $derived(serverState.activeServerRunning);
+	let serverStateString = $derived(serverState.activeServerStatus);
+	let prettyVersion = $derived(serverState.activeServerPrettyVersion);
+	let prettySoftware = $derived(serverState.activeServerPrettySoftware);
 
 	let consoleAbortController: AbortController | undefined;
 	let logs: string[] = $state([]);
 	let logContainer: HTMLDivElement | undefined = $state();
 	const MAX_LOG_LINES = 500;
 
-	let prettyVersion = $state('');
-	let prettySoftware = $state('');
-	let lastLoadedUuid: string | null = null;
-
-	async function loadInstanceDetails(): Promise<void> {
-		const selectedServer = serverState.selectedServer;
-		if (!selectedServer) {
-			prettyVersion = '';
-			prettySoftware = '';
-			return;
-		}
-
-		try {
-			const response1 = await fetch(`/api/v1/instances/${selectedServer.uuid}/details`, {
-				headers: {
-					Authorization: `Bearer ${sessionStorage.getItem('token')}`
-				}
-			});
-
-			if (!response1.ok) {
-				console.error('Failed to load instance details:', response1.statusText);
-				return;
-			}
-
-			const data1 = await response1.json();
-
-			const servercomponent = data1.instance.components.server_uid;
-
-			const response2 = await fetch(`/api/v1/components/details?uid=${servercomponent}`, {
-				headers: {
-					Authorization: `Bearer ${sessionStorage.getItem('token')}`
-				}
-			});
-
-			if (!response2.ok) {
-				console.error('Failed to load component details:', response2.statusText);
-				prettyVersion = '';
-				prettySoftware = '';
-				return;
-			}
-
-			const data2 = await response2.json();
-
-			prettyVersion = data2.component.display_version;
-			if (data2.component.display_component === 'Mojang') {
-				prettySoftware = 'Vanilla';
-			} else {
-				prettySoftware = data2.component.display_component;
-			}
-
-			return;
-		} catch (error) {
-			prettyVersion = '';
-			prettySoftware = '';
-			console.error(error);
-			toast.error(
-				'Failed to load instance details: ' +
-					(error instanceof Error ? error.message : String(error))
-			);
-		}
-	}
-
 	onMount(() => {
-		lastLoadedUuid = serverState.selectedServerUuid;
-		void loadInstanceDetails();
-		void reloadServerState();
-
-		const interval = setInterval(() => {
-			void reloadServerState();
-		}, 1000);
+		void serverState.loadServers();
+		void serverState.refreshActiveServerState({ includeDetails: true, forceDetails: true });
+		const detachPolling = serverState.attachActiveServerPolling();
 
 		return () => {
-			clearInterval(interval);
+			detachPolling();
 		};
 	});
 
@@ -237,41 +172,6 @@
 		};
 	});
 
-	async function reloadServerState(): Promise<void> {
-		const selectedServer = serverState.selectedServer;
-		if (!selectedServer) {
-			serverStatus = false;
-			serverStateString = 'stopped';
-			return;
-		}
-
-		const token = sessionStorage.getItem('token');
-		try {
-			const response = await fetch(`/api/v1/instances/${selectedServer.uuid}/status`, {
-				method: 'GET',
-				headers: {
-					Authorization: `Bearer ${token}`
-				}
-			});
-
-			if (!response.ok) {
-				console.error('Failed to reload server state:', response.statusText);
-				toast.error('Failed to reload server state: ' + response.statusText);
-				return;
-			}
-
-			const data = await response.json();
-			serverStatus = data.running;
-			serverStateString = data.status;
-			await serverState.loadServers();
-		} catch (error) {
-			console.error('Error reloading server state:', error);
-			toast.error(
-				'Error reloading server state: ' + (error instanceof Error ? error.message : String(error))
-			);
-		}
-	}
-
 	async function restartServer(): Promise<void> {
 		if (!serverState.selectedServer) {
 			return;
@@ -291,7 +191,7 @@
 				toast.error('Failed to restart server: ' + response.statusText);
 				return;
 			}
-			await reloadServerState();
+			await serverState.refreshActiveServerState({ includeDetails: false });
 		} catch (error) {
 			console.error('Error restarting server:', error);
 			toast.error(
@@ -319,7 +219,7 @@
 				toast.error('Failed to stop server: ' + response.statusText);
 				return;
 			}
-			await reloadServerState();
+			await serverState.refreshActiveServerState({ includeDetails: false });
 		} catch (error) {
 			console.error('Error stopping server:', error);
 			toast.error(
@@ -349,11 +249,11 @@
 				return;
 			}
 
-			serverStateString = 'starting';
+			serverState.setActiveServerStatus('starting', true);
 			if (token) {
 				void setupConsoleStream(selectedServer.uuid, token);
 			}
-			await reloadServerState();
+			await serverState.refreshActiveServerState({ includeDetails: false });
 		} catch (error) {
 			console.error('Error starting server:', error);
 			toast.error(
@@ -361,17 +261,6 @@
 			);
 		}
 	}
-
-	$effect(() => {
-		const selectedUuid = serverState.selectedServerUuid;
-		if (selectedUuid === lastLoadedUuid) {
-			return;
-		}
-
-		lastLoadedUuid = selectedUuid;
-		void loadInstanceDetails();
-		void reloadServerState();
-	});
 </script>
 
 <div class="flex h-full w-full items-center justify-center overflow-y-auto bg-background">
@@ -379,7 +268,7 @@
 		<div>
 			<Card.Root class="w-full">
 				<Card.Header class="space-y-3">
-					<Card.Title class="text-3xl leading-tight font-black break-words sm:text-5xl lg:text-6xl">
+					<Card.Title class="text-3xl leading-tight font-black wrap-break-word sm:text-5xl lg:text-6xl">
 						{servername}
 					</Card.Title>
 					<Card.Description class="flex flex-wrap items-center gap-2 text-sm sm:text-base">
