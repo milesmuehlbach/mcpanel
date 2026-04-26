@@ -53,24 +53,24 @@
 	<Sidebar.MenuButton
 		size="lg"
 		style={triggerShellStyle}
-		class={`data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground ${collapseProgress > 0.92 ? 'hover:bg-transparent data-[state=open]:bg-transparent' : ''}`}
+		class={`transition-[background-color,color,box-shadow] duration-200 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground ${collapseProgress > 0.92 ? 'hover:bg-transparent data-[state=open]:bg-transparent' : ''}`}
 	>
 		<div
 			class="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground"
 		>
 			<span class="text-xs leading-none font-bold">NS</span>
 		</div>
-		<span class="truncate font-medium">No servers</span>
+		<span class="truncate font-medium">No servers :&lpar;</span>
 	</Sidebar.MenuButton>
 {:else}
 	<Sidebar.Menu>
 		<Sidebar.MenuItem>
 			<DropdownMenu.Root>
-				<DropdownMenu.Trigger>
+				<DropdownMenu.Trigger class="w-full">
 					<Sidebar.MenuButton
 						size="lg"
 						style={triggerShellStyle}
-						class={`data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground ${collapseProgress > 0.92 ? 'hover:bg-transparent data-[state=open]:bg-transparent' : ''}`}
+						class={`transition-[background-color,color,box-shadow] duration-200 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground ${collapseProgress > 0.92 ? 'hover:bg-transparent data-[state=open]:bg-transparent' : ''}`}
 					>
 						<div
 							class="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground"
@@ -92,7 +92,7 @@
 					{#each servers as server (server.uuid)}
 						<DropdownMenu.Item
 							onSelect={() => selectServer(server.uuid)}
-							class="flex w-full items-center gap-2 p-2"
+							class="flex w-full items-center gap-2 p-2 transition-[background-color,color] duration-150 hover:bg-accent hover:text-accent-foreground"
 						>
 							<div class="flex size-6 items-center justify-center rounded-md border">
 								<span class="text-[10px] leading-none font-bold text-foreground">
@@ -105,12 +105,12 @@
 					<DropdownMenu.Separator />
 					<DropdownMenu.Item
 						onSelect={newServer}
-						class="flex w-full items-center gap-2 p-2 font-medium text-muted-foreground"
+						class="flex w-full items-center gap-2 p-2 font-medium text-muted-foreground transition-[background-color,color] duration-150 hover:bg-accent hover:text-accent-foreground"
 					>
 						<div class="flex size-6 items-center justify-center rounded-md border bg-transparent">
 							<PlusIcon class="size-4" />
 						</div>
-						<span>New server</span>
+						<span>Create new server</span>
 					</DropdownMenu.Item>
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
