@@ -2,7 +2,7 @@
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { Toaster } from '$lib/components/ui/sonner/index.js';
-	import * as Tooltip from '$lib/components/ui/tooltip/index.ts'
+	import * as Tooltip from '$lib/components/ui/tooltip/index.ts';
 
 	let { children } = $props();
 </script>

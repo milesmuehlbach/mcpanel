@@ -30,11 +30,13 @@ from app.instances import InstanceManager
 from app.paths import get_workdir
 from app.tasks import TaskManager
 
+
 def get_user_permissions(uid: int) -> list[str]:
     permissions = load_user_permissions(uid)
     if permissions is None:
         raise HTTPException(404, "user not found")
     return permissions
+
 
 def has_permissions(uid: int, required_permission: str) -> bool:
     permissions = get_user_permissions(uid)
@@ -52,6 +54,7 @@ def has_permissions(uid: int, required_permission: str) -> bool:
 
     return any(permission in accepted_permissions for permission in permissions)
 
+
 ########
 # INIT #
 ########
@@ -67,6 +70,7 @@ JWT_SECRET = get_setting("jwt_secret", secrets.token_urlsafe(32))
 # TODO: ts InstanceManager and TaskManager only work bc we're currently running only ONE FastAPI worker process! scaling to multiple workers fails, ts may need to be db-based in ts (near? far? who tf knows) future
 instance_manager = InstanceManager(get_workdir())
 task_manager = TaskManager()
+
 
 def get_auth_payload(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
@@ -85,6 +89,7 @@ def get_auth_payload(
 
     return payload
 
+
 def get_user_id(
     payload: dict[str, object] = Depends(get_auth_payload),
 ) -> int:
@@ -93,6 +98,7 @@ def get_user_id(
         raise HTTPException(401, "invalid token payload")
 
     return uid
+
 
 def require_permission(required_permission: str):
     def dependency(
@@ -104,7 +110,10 @@ def require_permission(required_permission: str):
 
     return dependency
 
-def _format_sse(data: str, event: str | None = None, event_id: int | None = None) -> str:
+
+def _format_sse(
+    data: str, event: str | None = None, event_id: int | None = None
+) -> str:
     lines: list[str] = []
     if event_id is not None:
         lines.append(f"id: {event_id}")
@@ -139,22 +148,24 @@ def _normalize_console_entry(entry: object) -> tuple[str, str]:
 
     return stream, data
 
+
 ##################
 # AUTH ENDPOINTS #
 ##################
+
 
 class AuthCredentialsInterface(BaseModel):
     username: str
     password: str
 
+
 class AuthPermissionsInterface(BaseModel):
     user_id: int | None = None
     permissions: dict[str, bool]
 
+
 @V1.post("/auth/login")
-async def _v1_auth_login(
-    body: AuthCredentialsInterface
-):
+async def _v1_auth_login(body: AuthCredentialsInterface):
     username = body.username.lower()
     password = body.password
 
@@ -162,32 +173,28 @@ async def _v1_auth_login(
 
     if result is None:
         raise HTTPException(401, "invalid username or password")
-    
+
     try:
         uid = result[0]
         hash = result[1]
         ph.verify(hash, password)
     except Exception:
         raise HTTPException(401, "invalid username or password")
-    
+
     token = jwt.encode(
-        {
-            "id": uid,
-            "exp": int((datetime.now() + timedelta(hours=24)).timestamp())
-        },
+        {"id": uid, "exp": int((datetime.now() + timedelta(hours=24)).timestamp())},
         JWT_SECRET,
-        algorithm="HS256"
+        algorithm="HS256",
     )
 
     return {"message": "login successful", "token": token}
+
 
 @V1.post(
     "/auth/register",
     dependencies=[Depends(require_permission("users.register_user"))],
 )
-async def _v1_auth_register(
-    body: AuthCredentialsInterface
-):
+async def _v1_auth_register(body: AuthCredentialsInterface):
     username = body.username.lower()
     password = body.password
 
@@ -206,6 +213,7 @@ async def _v1_auth_register(
         raise HTTPException(409, "username already exists")
 
     return {"message": "registration successful"}
+
 
 @V1.get("/auth/me")
 async def _v1_auth_me(
@@ -233,18 +241,18 @@ async def _v1_auth_me(
         "expires_at": expires_at,
     }
 
+
 @V1.get("/auth/onboarding")
 async def _v1_auth_onboarding_get():
     user_count = get_user_count()
     if user_count > 0:
         return {"message": "onboarding not allowed", "status": False}
-    
+
     return {"message": "onboarding allowed", "status": True}
 
+
 @V1.post("/auth/onboarding")
-async def _v1_auth_onboarding_post(
-    body: AuthCredentialsInterface
-):
+async def _v1_auth_onboarding_post(body: AuthCredentialsInterface):
     username = body.username
     password = body.password
 
@@ -265,10 +273,10 @@ async def _v1_auth_onboarding_post(
 
     return {"message": "onboarding successful"}
 
+
 @V1.get("/auth/permissions")
 async def _v1_auth_permissions_get(
-    uid: int = Depends(get_user_id),
-    user_id: int | None = None
+    uid: int = Depends(get_user_id), user_id: int | None = None
 ):
     target_uid = uid
     if user_id is not None and user_id != uid:
@@ -280,13 +288,13 @@ async def _v1_auth_permissions_get(
 
     return {"message": "success", "permissions": permissions}
 
+
 @V1.post(
     "/auth/permissions",
     dependencies=[Depends(require_permission("permissions.set_permissions"))],
 )
 async def _v1_auth_permissions_post(
-    body: AuthPermissionsInterface,
-    uid: int = Depends(get_user_id)
+    body: AuthPermissionsInterface, uid: int = Depends(get_user_id)
 ):
     target_uid = uid if body.user_id is None else body.user_id
     target_permissions = set(get_user_permissions(target_uid))
@@ -302,10 +310,16 @@ async def _v1_auth_permissions_post(
             raise HTTPException(403, "insufficient permissions")
 
         if not enabled:
-            if is_other_user and not has_permissions(uid, "permissions.view_permissions"):
+            if is_other_user and not has_permissions(
+                uid, "permissions.view_permissions"
+            ):
                 raise HTTPException(403, "insufficient permissions")
 
-            if not is_other_user and permission == "admin" and "admin" in target_permissions:
+            if (
+                not is_other_user
+                and permission == "admin"
+                and "admin" in target_permissions
+            ):
                 continue
 
             updated_permissions.discard(permission)
@@ -319,6 +333,7 @@ async def _v1_auth_permissions_post(
 
     return {"message": "success", "permissions": normalized_permissions}
 
+
 #######################
 # COMPONENT ENDPOINTS #
 #######################
@@ -327,21 +342,23 @@ MD5Hash = Annotated[str, StringConstraints(pattern=r"^[a-fA-F0-9]{32}$")]
 SHA1Hash = Annotated[str, StringConstraints(pattern=r"^[a-fA-F0-9]{40}$")]
 SHA256Hash = Annotated[str, StringConstraints(pattern=r"^[a-fA-F0-9]{64}$")]
 
+
 class ComponentInstallInterface(BaseModel):
     uid: str
     md5: MD5Hash | None = None
     sha1: SHA1Hash | None = None
     sha256: SHA256Hash | None = None
 
+
 @V1.get(
     "/components/list",
-    dependencies=[Depends(require_permission("components.list_components"))]
+    dependencies=[Depends(require_permission("components.list_components"))],
 )
 async def _v1_components_list(
     type: str,
 ):
     # TODO: query and cache available components on init
-    
+
     match type:
         case "jre":
             return {"message": "success", "components": java.get_available_runtimes()}
@@ -350,9 +367,10 @@ async def _v1_components_list(
         case _:
             raise HTTPException(400, "invalid component type")
 
+
 @V1.get(
     "/components/details",
-    dependencies=[Depends(require_permission("components.list_components"))]
+    dependencies=[Depends(require_permission("components.list_components"))],
 )
 async def _v1_components_details(
     uid: str,
@@ -373,15 +391,19 @@ async def _v1_components_details(
         (
             entry
             for entry in components
-            if isinstance(entry, dict) and isinstance(entry.get("uid"), str) and entry.get("uid").startswith(
-                normalized_uid if not normalized_uid.startswith("server:paper:") else "-".join(normalized_uid.split("-")[:-1])
+            if isinstance(entry, dict)
+            and isinstance(entry.get("uid"), str)
+            and entry.get("uid").startswith(
+                normalized_uid
+                if not normalized_uid.startswith("server:paper:")
+                else "-".join(normalized_uid.split("-")[:-1])
             )
         ),
         None,
     )
     if component is None:
         raise HTTPException(404, "component not found")
-    
+
     # visual fix for paper build numbers because we couldnt care less
     if component["component"] == "paper":
         component["display_version"] = component["display_version"].split(" (build ")[0]
@@ -389,9 +411,10 @@ async def _v1_components_details(
 
     return {"message": "success", "component": component}
 
+
 @V1.get(
     "/components/get_recommended_jre",
-    dependencies=[Depends(require_permission("components.list_components"))]
+    dependencies=[Depends(require_permission("components.list_components"))],
 )
 async def _v1_components_get_recommended_jre(
     server_uid: str,
@@ -403,9 +426,7 @@ async def _v1_components_get_recommended_jre(
     "/components/install",
     dependencies=[Depends(require_permission("components.install_component"))],
 )
-async def _v1_components_install(
-    body: ComponentInstallInterface
-):
+async def _v1_components_install(body: ComponentInstallInterface):
     ##############################################################################################
     # future TODO: 1. save size and hash data of installed components in db                      #
     #              2. verify integrity of installed components on launch                         #
@@ -435,9 +456,11 @@ async def _v1_components_install(
                 case "mojang":
                     hash = body.sha1.strip() if body.sha1 is not None else ""
                     if not hash:
-                        raise HTTPException(400, "sha1 is required for mojang server installation")
+                        raise HTTPException(
+                            400, "sha1 is required for mojang server installation"
+                        )
                 case "paper":
-                    hash = None # setting it again here for clarity
+                    hash = None  # setting it again here for clarity
 
             task_id = task_manager.enqueue(
                 install_server_component,
@@ -450,46 +473,46 @@ async def _v1_components_install(
         case _:
             raise HTTPException(400, "invalid component type")
 
+
 @V1.get("/components/installed")
 def _v1_components_installed():
     components = get_installed_components()
     return {"message": "success", "components": components}
 
+
 ##################
 # TASK ENDPOINTS #
 ##################
 
-@V1.get(
-    "/tasks/list",
-    dependencies=[Depends(require_permission("tasks.list_tasks"))]
-)
+
+@V1.get("/tasks/list", dependencies=[Depends(require_permission("tasks.list_tasks"))])
 async def _v1_tasks_list():
     return {
         "message": "success",
         "tasks": [asdict(task) for task in task_manager.list_tasks()],
     }
 
-@V1.get(
-    "/tasks/status",
-    dependencies=[Depends(require_permission("tasks.get_status"))]
-)
-async def _v1_tasks_status(
-    task_id: str
-):
+
+@V1.get("/tasks/status", dependencies=[Depends(require_permission("tasks.get_status"))])
+async def _v1_tasks_status(task_id: str):
     task = task_manager.get_task(task_id)
     if not task:
         raise HTTPException(404, "task not found")
     return {"message": "success", "task": asdict(task)}
 
+
 ######################
 # INSTANCE ENDPOINTS #
 ######################
 
+
 class InstanceInterface(BaseModel):
     uuid: str
 
+
 class OptionalInstanceInterface(InstanceInterface):
     uuid: str | None = None
+
 
 class InstanceParameterInterface(BaseModel):
     server_uid: str
@@ -498,34 +521,41 @@ class InstanceParameterInterface(BaseModel):
     memory: int | None = None
     arguments: list[str] | None = None
 
+
 class CommandInterface(BaseModel):
     command: str
 
+
 @V1.get(
     "/instances/list",
-    dependencies=[Depends(require_permission("instances.list_instances"))]
+    dependencies=[Depends(require_permission("instances.list_instances"))],
 )
 async def _v1_instances_list():
-    return {"message": "success", "instances": [instance.build_info() for instance in instance_manager.get_instances()]}
+    return {
+        "message": "success",
+        "instances": [
+            instance.build_info() for instance in instance_manager.get_instances()
+        ],
+    }
+
 
 @V1.post(
     "/instances/check",
-    dependencies=[Depends(require_permission("instances.list_instances"))]
+    dependencies=[Depends(require_permission("instances.list_instances"))],
 )
-async def _v1_instances_check(
-    body: InstanceInterface
-):
+async def _v1_instances_check(body: InstanceInterface):
     if instance_manager.has_instance(body.uuid):
         return {"message": "success", "status": True}
     return {"message": "success", "status": False}
 
+
 @V1.post(
     "/instances/reload",
-    dependencies=[Depends(require_permission("instances.create_instance"))] # TODO: maybe a seperate instances.manage_instances permission is more ideal? figure ts out ltr
+    dependencies=[
+        Depends(require_permission("instances.create_instance"))
+    ],  # TODO: maybe a seperate instances.manage_instances permission is more ideal? figure ts out ltr
 )
-async def _v1_instances_reload(
-    body: OptionalInstanceInterface
-):
+async def _v1_instances_reload(body: OptionalInstanceInterface):
     if body.uuid is None:
         instance_manager.scan_instances()
         return {"message": "success"}
@@ -533,13 +563,12 @@ async def _v1_instances_reload(
         instance_manager.reload_instance(body.uuid)
         return {"message": "success"}
 
+
 @V1.post(
     "/instances/create",
-    dependencies=[Depends(require_permission("instances.create_instance"))]
+    dependencies=[Depends(require_permission("instances.create_instance"))],
 )
-async def _v1_instances_create(
-    body: InstanceParameterInterface
-):
+async def _v1_instances_create(body: InstanceParameterInterface):
     instance = instance_manager.create_instance(
         server_uid=body.server_uid,
         java_uid=body.java_uid,
@@ -547,37 +576,44 @@ async def _v1_instances_create(
         memory=body.memory,
         arguments=body.arguments,
     )
-    return {"message": "success", "uuid": instance.uuid, "instance": instance.build_info()}
+    return {
+        "message": "success",
+        "uuid": instance.uuid,
+        "instance": instance.build_info(),
+    }
+
 
 @V1.get(
     "/instances/{instance_uuid:uuid}/details",
-    dependencies=[Depends(require_permission("instances.list_instances"))]
+    dependencies=[Depends(require_permission("instances.list_instances"))],
 )
-async def _v1_instances_details(
-    instance_uuid: UUID
-):
+async def _v1_instances_details(instance_uuid: UUID):
     if not instance_manager.has_instance(instance_uuid):
         raise HTTPException(404, "instance not found")
 
     instance = instance_manager.get_instance(instance_uuid)
     return {"message": "success", "instance": instance.build_info()}
 
+
 @V1.get(
     "/instances/{instance_uuid:uuid}/status",
-    dependencies=[Depends(require_permission("instances.list_instances"))]
+    dependencies=[Depends(require_permission("instances.list_instances"))],
 )
-async def _v1_instances_status(
-    instance_uuid: UUID
-):
+async def _v1_instances_status(instance_uuid: UUID):
     if not instance_manager.has_instance(instance_uuid):
         raise HTTPException(404, "instance not found")
 
     instance = instance_manager.get_instance(instance_uuid)
-    return {"message": "success", "status": instance.status, "running": instance.running}
+    return {
+        "message": "success",
+        "status": instance.status,
+        "running": instance.running,
+    }
+
 
 @V1.post(
     "/instances/{instance_uuid:uuid}/start",
-    dependencies=[Depends(require_permission("instances.start_instance"))]
+    dependencies=[Depends(require_permission("instances.start_instance"))],
 )
 async def _v1_instances_start(
     instance_uuid: UUID,
@@ -600,9 +636,10 @@ async def _v1_instances_start(
     )
     return {"message": "success", "task_id": task_id}
 
+
 @V1.post(
     "/instances/{instance_uuid:uuid}/stop",
-    dependencies=[Depends(require_permission("instances.stop_instance"))]
+    dependencies=[Depends(require_permission("instances.stop_instance"))],
 )
 async def _v1_instances_stop(
     instance_uuid: UUID,
@@ -625,12 +662,13 @@ async def _v1_instances_stop(
     )
     return {"message": "success", "task_id": task_id}
 
+
 @V1.post(
     "/instances/{instance_uuid:uuid}/restart",
     dependencies=[
         Depends(require_permission("instances.start_instance")),
         Depends(require_permission("instances.stop_instance")),
-    ]
+    ],
 )
 async def _v1_instances_restart(
     instance_uuid: UUID,
@@ -653,9 +691,10 @@ async def _v1_instances_restart(
     )
     return {"message": "success", "task_id": task_id}
 
+
 @V1.get(
     "/instances/{instance_uuid:uuid}/console",
-    dependencies=[Depends(require_permission("instances.read_console"))]
+    dependencies=[Depends(require_permission("instances.read_console"))],
 )
 async def _v1_instances_console_get(
     instance_uuid: UUID,
@@ -704,9 +743,10 @@ async def _v1_instances_console_get(
         },
     )
 
+
 @V1.post(
     "/instances/{instance_uuid:uuid}/console",
-    dependencies=[Depends(require_permission("instances.write_console"))]
+    dependencies=[Depends(require_permission("instances.write_console"))],
 )
 async def _v1_instances_console_post(
     instance_uuid: UUID,
@@ -718,5 +758,6 @@ async def _v1_instances_console_post(
     instance = instance_manager.get_instance(instance_uuid)
     instance.sendline(body.command)
     return {"message": "success"}
+
 
 api.include_router(V1)

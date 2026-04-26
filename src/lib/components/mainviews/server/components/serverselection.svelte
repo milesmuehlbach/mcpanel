@@ -97,37 +97,40 @@
 						<div class="flex min-w-0 flex-1 flex-col items-start justify-center gap-1 text-left">
 							<span class="w-full truncate leading-tight font-medium">{activeServerName}</span>
 
-						{#if showTriggerStatus}
-							<div class="flex flex-wrap items-center gap-1.5">
-								<Badge variant="secondary" class="flex items-center gap-1.5 text-[10px] leading-none">
-									{#if activeServerStatus === 'running' || activeServerStatus === 'stopped'}
-										<Circle
-											fill={activeServerRunning ? 'green' : 'red'}
-											color={activeServerRunning ? 'green' : 'red'}
-											class="size-2"
-										/>
-									{:else}
-										<Spinner class="size-2" />
-									{/if}
-									{activeServerStatus.charAt(0).toUpperCase() + activeServerStatus.slice(1)}
-								</Badge>
+							{#if showTriggerStatus}
+								<div class="flex flex-wrap items-center gap-1.5">
+									<Badge
+										variant="secondary"
+										class="flex items-center gap-1.5 text-[10px] leading-none"
+									>
+										{#if activeServerStatus === 'running' || activeServerStatus === 'stopped'}
+											<Circle
+												fill={activeServerRunning ? 'green' : 'red'}
+												color={activeServerRunning ? 'green' : 'red'}
+												class="size-2"
+											/>
+										{:else}
+											<Spinner class="size-2" />
+										{/if}
+										{activeServerStatus.charAt(0).toUpperCase() + activeServerStatus.slice(1)}
+									</Badge>
 
-								{#if showTriggerMeta}
-									{#if activeServerPrettySoftware !== ''}
-										<Badge variant="secondary" class="text-[10px] leading-none">
-											{activeServerPrettySoftware}
-										</Badge>
+									{#if showTriggerMeta}
+										{#if activeServerPrettySoftware !== ''}
+											<Badge variant="secondary" class="text-[10px] leading-none">
+												{activeServerPrettySoftware}
+											</Badge>
+										{/if}
+										{#if activeServerPrettyVersion !== ''}
+											<Badge variant="secondary" class="text-[10px] leading-none">
+												{activeServerPrettyVersion}
+											</Badge>
+										{/if}
 									{/if}
-									{#if activeServerPrettyVersion !== ''}
-										<Badge variant="secondary" class="text-[10px] leading-none">
-											{activeServerPrettyVersion}
-										</Badge>
-									{/if}
-								{/if}
-							</div>
-						{/if}
+								</div>
+							{/if}
 						</div>
-                    </Sidebar.MenuButton>
+					</Sidebar.MenuButton>
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content
 					class="w-(--bits-dropdown-menu-anchor-width) min-w-56 rounded-lg"

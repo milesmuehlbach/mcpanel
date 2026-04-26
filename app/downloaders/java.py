@@ -28,6 +28,7 @@ JAVA_EXECUTABLE_NAMES = {"java", "java.exe"}
 
 _THREAD_LOCAL = threading.local()
 
+
 def _get_platform_string() -> str:
     system = platform.system()
     architecture = platform.machine()
@@ -46,6 +47,7 @@ def _get_platform_string() -> str:
 
     return f"{runtime_system}-{runtime_architecture}"
 
+
 def _get_download_session() -> requests.Session:
     session = getattr(_THREAD_LOCAL, "session", None)
     if session is None:
@@ -53,6 +55,7 @@ def _get_download_session() -> requests.Session:
         _THREAD_LOCAL.session = session
 
     return session
+
 
 def _validate_download_payload(data: bytes, download: dict[str, Any], context: str):
     size = download.get("size")
@@ -67,6 +70,7 @@ def _validate_download_payload(data: bytes, download: dict[str, Any], context: s
     if sha1 is not None and hashlib.sha1(data).hexdigest() != sha1:
         raise ValueError(f"{context} sha1 mismatch")
 
+
 def _resolve_runtime_path(base_path: pathlib.Path, relative_path: str) -> pathlib.Path:
     resolved_base_path = base_path.resolve()
     resolved_target_path = (base_path / relative_path).resolve()
@@ -74,22 +78,33 @@ def _resolve_runtime_path(base_path: pathlib.Path, relative_path: str) -> pathli
     try:
         resolved_target_path.relative_to(resolved_base_path)
     except ValueError:
-        raise ValueError(f"upstream error in runtime manifest: invalid path {relative_path}")
+        raise ValueError(
+            f"upstream error in runtime manifest: invalid path {relative_path}"
+        )
 
     return resolved_target_path
 
-def _select_runtime_download(entry: dict[str, Any], relative_path: str) -> tuple[str, dict[str, Any], dict[str, Any] | None]:
+
+def _select_runtime_download(
+    entry: dict[str, Any], relative_path: str
+) -> tuple[str, dict[str, Any], dict[str, Any] | None]:
     downloads = entry.get("downloads")
     if not isinstance(downloads, dict):
-        raise ValueError(f"upstream error in runtime manifest: missing downloads for {relative_path}")
+        raise ValueError(
+            f"upstream error in runtime manifest: missing downloads for {relative_path}"
+        )
 
     raw_download = downloads.get("raw")
     if raw_download is not None and not isinstance(raw_download, dict):
-        raise ValueError(f"upstream error in runtime manifest: invalid raw download for {relative_path}")
+        raise ValueError(
+            f"upstream error in runtime manifest: invalid raw download for {relative_path}"
+        )
 
     lzma_download = downloads.get("lzma")
     if lzma_download is not None and not isinstance(lzma_download, dict):
-        raise ValueError(f"upstream error in runtime manifest: invalid lzma download for {relative_path}")
+        raise ValueError(
+            f"upstream error in runtime manifest: invalid lzma download for {relative_path}"
+        )
 
     if lzma_download is not None and lzma is not None:
         return "lzma", lzma_download, raw_download
@@ -100,7 +115,10 @@ def _select_runtime_download(entry: dict[str, Any], relative_path: str) -> tuple
     if lzma_download is not None:
         raise ValueError(f"python lzma support is required to install {relative_path}")
 
-    raise ValueError(f"upstream error in runtime manifest: missing downloads for {relative_path}")
+    raise ValueError(
+        f"upstream error in runtime manifest: missing downloads for {relative_path}"
+    )
+
 
 def _write_runtime_file(
     target_path: pathlib.Path,
@@ -134,20 +152,29 @@ def _write_runtime_file(
             temp_path.unlink(missing_ok=True)
         raise
 
+
 def _get_archive_member_path(member_name: str) -> pathlib.PurePosixPath:
     member_path = pathlib.PurePosixPath(member_name.replace("\\", "/"))
     if member_path.is_absolute() or ".." in member_path.parts:
-        raise ValueError(f"upstream error in runtime archive: invalid path {member_name}")
+        raise ValueError(
+            f"upstream error in runtime archive: invalid path {member_name}"
+        )
 
     return member_path
 
-def _get_java_prefix(member_paths: list[pathlib.PurePosixPath]) -> pathlib.PurePosixPath:
+
+def _get_java_prefix(
+    member_paths: list[pathlib.PurePosixPath],
+) -> pathlib.PurePosixPath:
     candidates = set()
     for member_path in member_paths:
         if len(member_path.parts) < 2:
             continue
 
-        if member_path.parts[-2] != "bin" or member_path.name not in JAVA_EXECUTABLE_NAMES:
+        if (
+            member_path.parts[-2] != "bin"
+            or member_path.name not in JAVA_EXECUTABLE_NAMES
+        ):
             continue
 
         candidates.add(member_path.parent.parent)
@@ -155,11 +182,16 @@ def _get_java_prefix(member_paths: list[pathlib.PurePosixPath]) -> pathlib.PureP
     if not candidates:
         raise ValueError("upstream error in runtime archive: missing JAVA_HOME")
 
-    ordered_candidates = sorted(candidates, key=lambda candidate: (len(candidate.parts), str(candidate)))
-    if len(ordered_candidates) > 1 and len(ordered_candidates[0].parts) == len(ordered_candidates[1].parts):
+    ordered_candidates = sorted(
+        candidates, key=lambda candidate: (len(candidate.parts), str(candidate))
+    )
+    if len(ordered_candidates) > 1 and len(ordered_candidates[0].parts) == len(
+        ordered_candidates[1].parts
+    ):
         raise ValueError("upstream error in runtime archive: ambiguous JAVA_HOME")
 
     return ordered_candidates[0]
+
 
 def _resolve_archive_symlink_target(
     staged_runtime_path: pathlib.Path,
@@ -168,11 +200,15 @@ def _resolve_archive_symlink_target(
     context: str,
 ) -> pathlib.Path:
     if not isinstance(link_target, str) or not link_target:
-        raise ValueError(f"upstream error in runtime archive: invalid symlink target ({context})")
+        raise ValueError(
+            f"upstream error in runtime archive: invalid symlink target ({context})"
+        )
 
     normalized_target = link_target.replace("\\", "/")
     if pathlib.PurePosixPath(normalized_target).is_absolute():
-        raise ValueError(f"upstream error in runtime archive: invalid symlink target ({context})")
+        raise ValueError(
+            f"upstream error in runtime archive: invalid symlink target ({context})"
+        )
 
     resolved_staged_runtime_path = staged_runtime_path.resolve()
     resolved_target_path = (link_path.parent / normalized_target).resolve()
@@ -180,9 +216,12 @@ def _resolve_archive_symlink_target(
     try:
         resolved_target_path.relative_to(resolved_staged_runtime_path)
     except ValueError:
-        raise ValueError(f"upstream error in runtime archive: invalid symlink target ({context})")
+        raise ValueError(
+            f"upstream error in runtime archive: invalid symlink target ({context})"
+        )
 
     return resolved_target_path
+
 
 def _materialize_archive_symlink(
     link_path: pathlib.Path,
@@ -199,9 +238,11 @@ def _materialize_archive_symlink(
     link_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        os.symlink(link_target, link_path, target_is_directory=resolved_target_path.is_dir())
+        os.symlink(
+            link_target, link_path, target_is_directory=resolved_target_path.is_dir()
+        )
         return
-    except (AttributeError, NotImplementedError, OSError):
+    except AttributeError, NotImplementedError, OSError:
         pass
 
     if resolved_target_path.is_file():
@@ -212,7 +253,10 @@ def _materialize_archive_symlink(
         shutil.copytree(resolved_target_path, link_path)
         return
 
-    raise ValueError(f"upstream error in runtime archive: unsupported symlink target ({context})")
+    raise ValueError(
+        f"upstream error in runtime archive: unsupported symlink target ({context})"
+    )
+
 
 def _finalize_archive_symlinks(
     staged_runtime_path: pathlib.Path,
@@ -235,14 +279,21 @@ def _finalize_archive_symlinks(
                 next_pending_entries.append((link_path, link_target, context))
                 continue
 
-            _materialize_archive_symlink(link_path, link_target, resolved_target_path, context)
+            _materialize_archive_symlink(
+                link_path, link_target, resolved_target_path, context
+            )
             progress_made = True
 
         if not progress_made:
-            unresolved_context = ", ".join(context for _, _, context in next_pending_entries[:3])
-            raise ValueError(f"upstream error in runtime archive: unresolved symlink target ({unresolved_context})")
+            unresolved_context = ", ".join(
+                context for _, _, context in next_pending_entries[:3]
+            )
+            raise ValueError(
+                f"upstream error in runtime archive: unresolved symlink target ({unresolved_context})"
+            )
 
         pending_entries = next_pending_entries
+
 
 def _extract_zip_runtime(zip_content: bytes, runtime_path: pathlib.Path):
     runtime_path.parent.mkdir(parents=True, exist_ok=True)
@@ -280,7 +331,9 @@ def _extract_zip_runtime(zip_content: bytes, runtime_path: pathlib.Path):
                 if str(relative_member_path) == ".":
                     continue
 
-                target_path = _resolve_runtime_path(staged_runtime_path, str(relative_member_path))
+                target_path = _resolve_runtime_path(
+                    staged_runtime_path, str(relative_member_path)
+                )
 
                 if info.is_dir():
                     target_path.mkdir(parents=True, exist_ok=True)
@@ -294,10 +347,14 @@ def _extract_zip_runtime(zip_content: bytes, runtime_path: pathlib.Path):
                     try:
                         symlink_target = symlink_target_data.decode("utf-8")
                     except UnicodeDecodeError:
-                        raise ValueError(f"upstream error in runtime archive: invalid symlink target ({info.filename})")
+                        raise ValueError(
+                            f"upstream error in runtime archive: invalid symlink target ({info.filename})"
+                        )
 
                     if "\x00" in symlink_target:
-                        raise ValueError(f"upstream error in runtime archive: invalid symlink target ({info.filename})")
+                        raise ValueError(
+                            f"upstream error in runtime archive: invalid symlink target ({info.filename})"
+                        )
 
                     symlink_entries.append((target_path, symlink_target, info.filename))
                     continue
@@ -306,7 +363,11 @@ def _extract_zip_runtime(zip_content: bytes, runtime_path: pathlib.Path):
                     data = member_file.read()
 
                 if not mode:
-                    mode = 0o755 if relative_member_path.name in JAVA_EXECUTABLE_NAMES else 0o644
+                    mode = (
+                        0o755
+                        if relative_member_path.name in JAVA_EXECUTABLE_NAMES
+                        else 0o644
+                    )
 
                 _write_runtime_file(target_path, data, mode=mode)
                 extracted_files += 1
@@ -316,8 +377,13 @@ def _extract_zip_runtime(zip_content: bytes, runtime_path: pathlib.Path):
             if extracted_files == 0:
                 raise ValueError("upstream error in runtime archive: empty JAVA_HOME")
 
-            if not any((staged_runtime_path / "bin" / name).is_file() for name in JAVA_EXECUTABLE_NAMES):
-                raise ValueError("upstream error in runtime archive: missing java executable")
+            if not any(
+                (staged_runtime_path / "bin" / name).is_file()
+                for name in JAVA_EXECUTABLE_NAMES
+            ):
+                raise ValueError(
+                    "upstream error in runtime archive: missing java executable"
+                )
 
             if runtime_path.exists():
                 if runtime_path.is_dir():
@@ -326,6 +392,7 @@ def _extract_zip_runtime(zip_content: bytes, runtime_path: pathlib.Path):
                     runtime_path.unlink()
 
             shutil.move(str(staged_runtime_path), str(runtime_path))
+
 
 def _extract_tar_gz_runtime(tar_gz_content: bytes, runtime_path: pathlib.Path):
     runtime_path.parent.mkdir(parents=True, exist_ok=True)
@@ -363,7 +430,9 @@ def _extract_tar_gz_runtime(tar_gz_content: bytes, runtime_path: pathlib.Path):
                 if str(relative_member_path) == ".":
                     continue
 
-                target_path = _resolve_runtime_path(staged_runtime_path, str(relative_member_path))
+                target_path = _resolve_runtime_path(
+                    staged_runtime_path, str(relative_member_path)
+                )
 
                 if member.isdir():
                     target_path.mkdir(parents=True, exist_ok=True)
@@ -371,22 +440,32 @@ def _extract_tar_gz_runtime(tar_gz_content: bytes, runtime_path: pathlib.Path):
 
                 if member.issym():
                     if "\x00" in member.linkname:
-                        raise ValueError(f"upstream error in runtime archive: invalid symlink target ({member.name})")
+                        raise ValueError(
+                            f"upstream error in runtime archive: invalid symlink target ({member.name})"
+                        )
 
                     symlink_entries.append((target_path, member.linkname, member.name))
                     continue
 
                 if not (member.isfile() or member.islnk()):
-                    raise ValueError(f"upstream error in runtime archive: unsupported entry type ({member.name})")
+                    raise ValueError(
+                        f"upstream error in runtime archive: unsupported entry type ({member.name})"
+                    )
 
                 extracted_member = archive.extractfile(member)
                 if extracted_member is None:
-                    raise ValueError(f"upstream error in runtime archive: failed to extract {member.name}")
+                    raise ValueError(
+                        f"upstream error in runtime archive: failed to extract {member.name}"
+                    )
 
                 with extracted_member:
                     data = extracted_member.read()
 
-                mode = member.mode or (0o755 if relative_member_path.name in JAVA_EXECUTABLE_NAMES else 0o644)
+                mode = member.mode or (
+                    0o755
+                    if relative_member_path.name in JAVA_EXECUTABLE_NAMES
+                    else 0o644
+                )
                 _write_runtime_file(target_path, data, mode=mode)
                 extracted_files += 1
 
@@ -395,8 +474,13 @@ def _extract_tar_gz_runtime(tar_gz_content: bytes, runtime_path: pathlib.Path):
             if extracted_files == 0:
                 raise ValueError("upstream error in runtime archive: empty JAVA_HOME")
 
-            if not any((staged_runtime_path / "bin" / name).is_file() for name in JAVA_EXECUTABLE_NAMES):
-                raise ValueError("upstream error in runtime archive: missing java executable")
+            if not any(
+                (staged_runtime_path / "bin" / name).is_file()
+                for name in JAVA_EXECUTABLE_NAMES
+            ):
+                raise ValueError(
+                    "upstream error in runtime archive: missing java executable"
+                )
 
             if runtime_path.exists():
                 if runtime_path.is_dir():
@@ -405,6 +489,7 @@ def _extract_tar_gz_runtime(tar_gz_content: bytes, runtime_path: pathlib.Path):
                     runtime_path.unlink()
 
             shutil.move(str(staged_runtime_path), str(runtime_path))
+
 
 def _remove_macos_quarantine(runtime_path: pathlib.Path):
     if platform.system() != "Darwin":
@@ -420,32 +505,46 @@ def _remove_macos_quarantine(runtime_path: pathlib.Path):
     except OSError:
         pass
 
-def _download_json_runtime_file(base_path: pathlib.Path, relative_path: str, entry: dict[str, Any]):
+
+def _download_json_runtime_file(
+    base_path: pathlib.Path, relative_path: str, entry: dict[str, Any]
+):
     variant, download, final_download = _select_runtime_download(entry, relative_path)
 
     url = download.get("url")
     if not isinstance(url, str) or not url:
-        raise ValueError(f"upstream error in runtime manifest: missing url for {relative_path}")
+        raise ValueError(
+            f"upstream error in runtime manifest: missing url for {relative_path}"
+        )
 
     session = _get_download_session()
     response = session.get(url)
     response.raise_for_status()
 
     payload = response.content
-    _validate_download_payload(payload, download, f"downloaded runtime file {variant}: {relative_path}")
+    _validate_download_payload(
+        payload, download, f"downloaded runtime file {variant}: {relative_path}"
+    )
 
     file_data = payload
     if variant == "lzma":
         try:
             file_data = lzma.decompress(payload)
         except Exception:
-            raise ValueError(f"downloaded runtime file lzma decode failed: {relative_path}")
+            raise ValueError(
+                f"downloaded runtime file lzma decode failed: {relative_path}"
+            )
 
     if final_download is not None:
-        _validate_download_payload(file_data, final_download, f"downloaded runtime file raw: {relative_path}")
+        _validate_download_payload(
+            file_data, final_download, f"downloaded runtime file raw: {relative_path}"
+        )
 
     target_path = _resolve_runtime_path(base_path, relative_path)
-    _write_runtime_file(target_path, file_data, executable=bool(entry.get("executable")))
+    _write_runtime_file(
+        target_path, file_data, executable=bool(entry.get("executable"))
+    )
+
 
 def _download_json_runtime(manifest_content: bytes, base_path: pathlib.Path):
     try:
@@ -465,15 +564,21 @@ def _download_json_runtime(manifest_content: bytes, base_path: pathlib.Path):
             raise ValueError("upstream error in runtime manifest: invalid path")
 
         if not isinstance(entry, dict):
-            raise ValueError(f"upstream error in runtime manifest: invalid entry for {relative_path}")
+            raise ValueError(
+                f"upstream error in runtime manifest: invalid entry for {relative_path}"
+            )
 
         entry_type = entry.get("type")
         if entry_type == "directory":
-            _resolve_runtime_path(base_path, relative_path).mkdir(parents=True, exist_ok=True)
+            _resolve_runtime_path(base_path, relative_path).mkdir(
+                parents=True, exist_ok=True
+            )
             continue
 
         if entry_type != "file":
-            raise ValueError(f"upstream error in runtime manifest: unsupported entry type for {relative_path}")
+            raise ValueError(
+                f"upstream error in runtime manifest: unsupported entry type for {relative_path}"
+            )
 
         file_entries.append((relative_path, entry))
 
@@ -483,12 +588,15 @@ def _download_json_runtime(manifest_content: bytes, base_path: pathlib.Path):
     worker_count = min(MAX_DOWNLOAD_WORKERS, len(file_entries))
     with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count) as executor:
         futures = [
-            executor.submit(_download_json_runtime_file, base_path, relative_path, entry)
+            executor.submit(
+                _download_json_runtime_file, base_path, relative_path, entry
+            )
             for relative_path, entry in file_entries
         ]
 
         for future in concurrent.futures.as_completed(futures):
             future.result()
+
 
 def get_available_runtimes():
     s = requests.Session()
@@ -508,30 +616,38 @@ def get_available_runtimes():
     for package in json.get("packages", []):
         if package.get("uid") in SUPPORTED_RUNTIMES:
             valid_uids[package.get("uid")] = package.get("sha256")
-    
+
     entries = []
     for id, sha256 in valid_uids.items():
         r = s.get(PRISM_META_URL + id + "/index.json")
 
         if hashlib.sha256(r.content).hexdigest() != sha256:
-            raise ValueError(f"upstream error in prism metadata: sha256 mismatch for {id}")        
-        
+            raise ValueError(
+                f"upstream error in prism metadata: sha256 mismatch for {id}"
+            )
+
         try:
             json = r.json()
         except:
             raise ValueError(f"upstream error in prism metadata: invalid json")
-        
+
         if json.get("formatVersion") != 1:
-            raise ValueError(f"upstream error in prism metadata: unsupported format version")
-        
+            raise ValueError(
+                f"upstream error in prism metadata: unsupported format version"
+            )
+
         if json.get("uid") != id:
             raise ValueError(f"upstream error in prism metadata: uid mismatch for {id}")
-        
+
         for version in json.get("versions", []):
             display_type = "Java"
-            display_component = {"net.minecraft.java": "OpenJDK", "com.azul.java": "Azul", "net.adoptium.java": "Adoptium"}.get(id, id)
+            display_component = {
+                "net.minecraft.java": "OpenJDK",
+                "com.azul.java": "Azul",
+                "net.adoptium.java": "Adoptium",
+            }.get(id, id)
             display_version = version.get("version").replace("java", "")
-            
+
             entries.append(
                 {
                     "uid": f"jre:{id}:{version.get('version')}",
@@ -545,13 +661,16 @@ def get_available_runtimes():
                     "hashes": {
                         "md5": version.get("md5"),
                         "sha1": version.get("sha1"),
-                        "sha256": version.get("sha256") # only sha256 should be present in prism metadata
+                        "sha256": version.get(
+                            "sha256"
+                        ),  # only sha256 should be present in prism metadata
                     },
                     "released_at": version.get("releaseTime"),
                 }
             )
 
     return entries
+
 
 def download_runtime(uid: str, sha256: str | None, base_path: pathlib.Path):
     s = requests.Session()
@@ -569,7 +688,10 @@ def download_runtime(uid: str, sha256: str | None, base_path: pathlib.Path):
     metadata_response = s.get(PRISM_META_URL + component + "/" + version + ".json")
     metadata_response.raise_for_status()
 
-    if sha256 is not None and hashlib.sha256(metadata_response.content).hexdigest() != sha256:
+    if (
+        sha256 is not None
+        and hashlib.sha256(metadata_response.content).hexdigest() != sha256
+    ):
         raise ValueError(f"downloaded runtime sha256 mismatch")
 
     try:
@@ -578,7 +700,9 @@ def download_runtime(uid: str, sha256: str | None, base_path: pathlib.Path):
         raise ValueError(f"upstream error in prism metadata: invalid json")
 
     if metadata.get("formatVersion") != 1:
-        raise ValueError(f"upstream error in prism metadata: unsupported format version")
+        raise ValueError(
+            f"upstream error in prism metadata: unsupported format version"
+        )
 
     platform_string = _get_platform_string()
 
@@ -617,9 +741,12 @@ def download_runtime(uid: str, sha256: str | None, base_path: pathlib.Path):
     r = s.get(url)
     r.raise_for_status()
 
-    if runtime_sha256 is not None and hashlib.sha256(r.content).hexdigest() != runtime_sha256:
+    if (
+        runtime_sha256 is not None
+        and hashlib.sha256(r.content).hexdigest() != runtime_sha256
+    ):
         raise ValueError(f"downloaded runtime sha256 mismatch")
-    
+
     runtime_path = base_path / "jre" / component / version
 
     if url.endswith(".json"):

@@ -268,7 +268,9 @@
 		<div>
 			<Card.Root class="w-full">
 				<Card.Header class="space-y-3">
-					<Card.Title class="text-3xl leading-tight font-black wrap-break-word sm:text-5xl lg:text-6xl">
+					<Card.Title
+						class="text-3xl leading-tight font-black wrap-break-word sm:text-5xl lg:text-6xl"
+					>
 						{servername}
 					</Card.Title>
 					<Card.Description class="flex flex-wrap items-center gap-2 text-sm sm:text-base">

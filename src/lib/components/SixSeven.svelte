@@ -2,7 +2,7 @@
 <script lang="ts">
 	let {
 		durationMs = 6767,
-		amplitude = 67/2,
+		amplitude = 67 / 2,
 		fontSize = 'clamp(4rem, 16vw, 9rem)'
 	}: {
 		durationMs?: number;

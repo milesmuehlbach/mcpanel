@@ -38,7 +38,7 @@
 				const data = await response.json();
 				console.log('Login successful:', data);
 				errordis = 'Login Successful : ' + data.message;
-				sessionStorage.setItem('token', data.token)
+				sessionStorage.setItem('token', data.token);
 				onSuccess();
 			} else {
 				const error = await response.json();

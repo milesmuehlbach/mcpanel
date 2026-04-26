@@ -16,6 +16,7 @@ spanning all server softwares and game versions, we are a open-source self-hosta
 ### technical details for the hc reviewers
 
 this was a collaborative project in between @milesmuehlbach and @TechDudie.
+
 - svelte frontend w/ adapter-static in SSG, utilizes tailwind v4 & shadcn-svelte for HOLY PEAK ui, handled by @milesmuehlbach
 - async fastapi backend and stateful task management, utilizes LOTS of 3p apis/cdns for very peak reasons, handled by @TechDudie
 

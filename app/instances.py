@@ -14,7 +14,15 @@ from colorama import Fore, Style, just_fix_windows_console
 from app.database import get_installed_components
 
 MEM_DATA = psutil.virtual_memory()
-DEFAULT_MB = max(1024, min(8192, int(MEM_DATA.total / 1024 / 1024 / (4 if platform.system() == "Windows" else 2))))
+DEFAULT_MB = max(
+    1024,
+    min(
+        8192,
+        int(
+            MEM_DATA.total / 1024 / 1024 / (4 if platform.system() == "Windows" else 2)
+        ),
+    ),
+)
 DEFAULT_ARGUMENTS = [
     "-XX:+AlwaysPreTouch",
     "-XX:+DisableExplicitGC",
@@ -34,12 +42,10 @@ DEFAULT_ARGUMENTS = [
     "-XX:MaxGCPauseMillis=200",
     "-XX:MaxTenuringThreshold=1",
     "-XX:SurvivorRatio=32",
-    "-DIReallyKnowWhatIAmDoingISwear"
+    "-DIReallyKnowWhatIAmDoingISwear",
 ]
 
-DEFAULT_PARAMTERS = [
-    "nogui"
-]
+DEFAULT_PARAMTERS = ["nogui"]
 
 JAVA_COMPONENT_UID_PATTERN = re.compile(r"^jre:(?!.*\.{2})[a-z.]+:[a-z0-9]+$")
 SERVER_COMPONENT_UID_PATTERN = re.compile(r"^server:[a-z]+:(?!.*\.{2})[a-z0-9.-]+$")
@@ -48,28 +54,37 @@ SERVER_COMPONENT_UID_PATTERN = re.compile(r"^server:[a-z]+:(?!.*\.{2})[a-z0-9.-]
 
 ConsoleStream = Literal["stdin", "stdout"]
 
+
 class ConsoleEntry(TypedDict):
     stream: ConsoleStream
     data: str
+
 
 just_fix_windows_console()
 SERVER_LABEL_COLOR = Fore.LIGHTMAGENTA_EX
 SERVER_COLON_COLOR = Fore.WHITE
 COLOR_RESET = Style.RESET_ALL
 
+
 def _utcnow() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc)
+
 
 def _to_datetime(timestamp: int | float) -> datetime.datetime:
     if timestamp > 10_000_000_000:
         timestamp = timestamp / 1000
     return datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc)
 
+
 def _is_valid_timestamp(value: object) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0
+    return (
+        isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0
+    )
+
 
 def _to_epoch_seconds(value: datetime.datetime) -> int:
     return int(value.timestamp())
+
 
 class Instance:
     def __init__(self, uuid: uuid.UUID, base_path: pathlib.Path):
@@ -96,7 +111,9 @@ class Instance:
         self.bridge_thread = None
         self.running = False
         self.status = "stopped"
-        self.console: list[ConsoleEntry] = [] # NOTE: log capture is super simple atm. not particularly robust. instead of capturing stdout in rt, maybe forward latest.log as it updates?
+        self.console: list[ConsoleEntry] = (
+            []
+        )  # NOTE: log capture is super simple atm. not particularly robust. instead of capturing stdout in rt, maybe forward latest.log as it updates?
 
         self.set_defaults()
         self.load_instance_config()
@@ -125,15 +142,16 @@ class Instance:
             "running": self.running,
             "jar": self.jar,
             "java": self.java,
-            "components": {
-                "server_uid": self._server_uid,
-                "java_uid": self._java_uid
-            },
+            "components": {"server_uid": self._server_uid, "java_uid": self._java_uid},
             "memory": self.memory,
             "arguments": list(self.arguments),
             "created_at": _to_epoch_seconds(self.created_at),
             "updated_at": _to_epoch_seconds(self.updated_at),
-            "started_at": _to_epoch_seconds(self.started_at) if self.started_at is not None else None
+            "started_at": (
+                _to_epoch_seconds(self.started_at)
+                if self.started_at is not None
+                else None
+            ),
         }
 
     @property
@@ -194,7 +212,9 @@ class Instance:
 
     @arguments.setter
     def arguments(self, value: list[str]):
-        if not isinstance(value, list) or not all(isinstance(argument, str) for argument in value):
+        if not isinstance(value, list) or not all(
+            isinstance(argument, str) for argument in value
+        ):
             raise ValueError("arguments must be a list of strings")
         self._arguments = list(value)
         self.updated_at = _utcnow()
@@ -204,14 +224,14 @@ class Instance:
     def load_instance_config(self):
         try:
             config = json.loads(self.json.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            self.save_instance_config() # save ts defaults
+        except OSError, json.JSONDecodeError:
+            self.save_instance_config()  # save ts defaults
             return
 
         if not isinstance(config, dict):
             self.save_instance_config()
             return
-        
+
         version = config.get("version")
         if isinstance(version, int) and version > 0:
             match version:
@@ -231,27 +251,45 @@ class Instance:
                     components = config.get("components")
                     if isinstance(components, dict):
                         server_uid = components.get("server_uid")
-                        if isinstance(server_uid, str) and SERVER_COMPONENT_UID_PATTERN.fullmatch(server_uid):
+                        if isinstance(
+                            server_uid, str
+                        ) and SERVER_COMPONENT_UID_PATTERN.fullmatch(server_uid):
                             self._server_uid = server_uid
 
                         java_uid = components.get("java_uid")
-                        if isinstance(java_uid, str) and JAVA_COMPONENT_UID_PATTERN.fullmatch(java_uid):
+                        if isinstance(
+                            java_uid, str
+                        ) and JAVA_COMPONENT_UID_PATTERN.fullmatch(java_uid):
                             self._java_uid = java_uid
 
-                    if self._server_uid is None and isinstance(self._jar, str) and self._jar.endswith(".jar"):
+                    if (
+                        self._server_uid is None
+                        and isinstance(self._jar, str)
+                        and self._jar.endswith(".jar")
+                    ):
                         inferred_server_uid = self._jar[:-4].replace("_", ":")
                         if SERVER_COMPONENT_UID_PATTERN.fullmatch(inferred_server_uid):
                             self._server_uid = inferred_server_uid
 
-                    if self._java_uid is None and isinstance(self._java, str) and JAVA_COMPONENT_UID_PATTERN.fullmatch(self._java):
+                    if (
+                        self._java_uid is None
+                        and isinstance(self._java, str)
+                        and JAVA_COMPONENT_UID_PATTERN.fullmatch(self._java)
+                    ):
                         self._java_uid = self._java
 
                     memory = config.get("memory")
-                    if isinstance(memory, int) and not isinstance(memory, bool) and memory > 0:
+                    if (
+                        isinstance(memory, int)
+                        and not isinstance(memory, bool)
+                        and memory > 0
+                    ):
                         self._memory = memory
 
                     arguments = config.get("arguments")
-                    if isinstance(arguments, list) and all(isinstance(argument, str) for argument in arguments):
+                    if isinstance(arguments, list) and all(
+                        isinstance(argument, str) for argument in arguments
+                    ):
                         self._arguments = list(arguments)
 
                     created_at = config.get("created_at")
@@ -267,16 +305,27 @@ class Instance:
     def save_instance_config(self):
         self.path.mkdir(parents=True, exist_ok=True)
         self.json.write_text(json.dumps(self.build_info(), indent=4), encoding="utf-8")
-    
+
     @staticmethod
-    def create_instance(base_path: pathlib.Path, server_uid: str, java_uid: str, name: str | None = None, memory: int | None = None, arguments: list[str] | None = None) -> Instance:
+    def create_instance(
+        base_path: pathlib.Path,
+        server_uid: str,
+        java_uid: str,
+        name: str | None = None,
+        memory: int | None = None,
+        arguments: list[str] | None = None,
+    ) -> Instance:
         base_path = base_path.resolve()
         installed_components = get_installed_components()
         if server_uid not in installed_components:
-            raise ValueError(f"specified server component with uid '{server_uid}' is not installed")
+            raise ValueError(
+                f"specified server component with uid '{server_uid}' is not installed"
+            )
         if java_uid not in installed_components:
-            raise ValueError(f"specified java component with uid '{java_uid}' is not installed")
-        
+            raise ValueError(
+                f"specified java component with uid '{java_uid}' is not installed"
+            )
+
         instance = Instance(uuid.uuid4(), base_path)
         # vulnerable, validate!!!
         if name is not None:
@@ -297,10 +346,13 @@ class Instance:
         shutil.copy2(source_server_jar, destination_server_jar)
 
         eula_path = instance.path / "eula.txt"
-        eula_path.write_text(f"# This file was generated by MCPanel at {instance.updated_at}, with the acknowledgement of the user.\n# By using MCPanel, you agree to the Minecraft EULA at https://www.minecraft.net/eula\n\neula=true\n", encoding="utf-8")
+        eula_path.write_text(
+            f"# This file was generated by MCPanel at {instance.updated_at}, with the acknowledgement of the user.\n# By using MCPanel, you agree to the Minecraft EULA at https://www.minecraft.net/eula\n\neula=true\n",
+            encoding="utf-8",
+        )
 
         return instance
-    
+
     @staticmethod
     def delete_instance(base_path: pathlib.Path, uuid: uuid.UUID):
         instance_root = (base_path / "instances").resolve()
@@ -311,11 +363,17 @@ class Instance:
         if not instance_path.exists():
             raise FileNotFoundError(f"instance path does not exist: {instance_path}")
         if not instance_path.is_dir() or instance_path.is_symlink():
-            raise ValueError(f"refusing to delete non-directory or symlink path: {instance_path}")
+            raise ValueError(
+                f"refusing to delete non-directory or symlink path: {instance_path}"
+            )
 
-        pending_delete_path = instance_root / f".deleting-{uuid}-{_to_epoch_seconds(_utcnow())}"
+        pending_delete_path = (
+            instance_root / f".deleting-{uuid}-{_to_epoch_seconds(_utcnow())}"
+        )
         if pending_delete_path.exists():
-            raise FileExistsError(f"temporary deletion path already exists: {pending_delete_path}")
+            raise FileExistsError(
+                f"temporary deletion path already exists: {pending_delete_path}"
+            )
 
         instance_path.rename(pending_delete_path)
         try:
@@ -327,12 +385,14 @@ class Instance:
     def start(self):
         if self.running:
             raise RuntimeError(f"instance {self.uuid} is already running")
-        
+
         java_executable = self._get_java_executable()
         source_server_jar = self._get_server_jar()
         instance_server_jar = (self.path / source_server_jar.name).resolve()
         if not instance_server_jar.is_file():
-            raise FileNotFoundError(f"instance server jar not found at expected path: {instance_server_jar}")
+            raise FileNotFoundError(
+                f"instance server jar not found at expected path: {instance_server_jar}"
+            )
 
         command = [
             str(java_executable),
@@ -341,7 +401,7 @@ class Instance:
             *self.arguments,
             "-jar",
             str(instance_server_jar.name),
-            *DEFAULT_PARAMTERS
+            *DEFAULT_PARAMTERS,
         ]
 
         # TODO: automatically restart server on crash? make it a user option?
@@ -353,7 +413,7 @@ class Instance:
             # stderr=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            bufsize=1
+            bufsize=1,
         )
         self.running = True
         self.status = "starting"
@@ -369,12 +429,12 @@ class Instance:
         if self.process and self.running:
             self.sendline("stop")
             self.status = "stopping"
-            self.process.wait() # synchronous
+            self.process.wait()  # synchronous
             self.running = False
             self.status = "stopped"
             # self.started_at = None # NOTE: i don't think that we should clear the timestamp state on stop bc it could be useful in future anyways
             # self.save_instance_config()
-        
+
     def sendline(self, cmd: str):
         if self.process and self.running and self.process.stdin:
             command = cmd.rstrip("\r\n")
@@ -382,11 +442,13 @@ class Instance:
                 self.status = "stopping"
             self.process.stdin.write(command + "\n")
             self.process.stdin.flush()
-            print(f"{SERVER_LABEL_COLOR}SERVER{SERVER_COLON_COLOR}:{COLOR_RESET}   >{command}{COLOR_RESET}")
+            print(
+                f"{SERVER_LABEL_COLOR}SERVER{SERVER_COLON_COLOR}:{COLOR_RESET}   >{command}{COLOR_RESET}"
+            )
             self.console.append({"stream": "stdin", "data": command})
         else:
             raise RuntimeError(f"instance {self.uuid} is not running")
-    
+
     def _bridge_runner(self):
         while self.running and self.process and self.process.stdout:
             lineout = self.process.stdout.readline()
@@ -396,26 +458,39 @@ class Instance:
             lineout = lineout.rstrip("\r\n")
             if "Done" in lineout:
                 self.status = "running"
-            print(f"{SERVER_LABEL_COLOR}SERVER{SERVER_COLON_COLOR}:{COLOR_RESET}   {lineout}{COLOR_RESET}")
+            print(
+                f"{SERVER_LABEL_COLOR}SERVER{SERVER_COLON_COLOR}:{COLOR_RESET}   {lineout}{COLOR_RESET}"
+            )
             self.console.append({"stream": "stdout", "data": lineout})
-        
+
         self.status = "stopped"
         self.running = False
 
     def _get_java_executable(self) -> pathlib.Path:
         java_uid = self._java_uid
-        if not isinstance(java_uid, str) or not JAVA_COMPONENT_UID_PATTERN.fullmatch(java_uid):
+        if not isinstance(java_uid, str) or not JAVA_COMPONENT_UID_PATTERN.fullmatch(
+            java_uid
+        ):
             raise ValueError(f"invalid java uid format: {java_uid}")
 
         java_parts = java_uid.split(":")
 
-        java_executable = (self.base_path / pathlib.Path(*java_parts) / "bin" / ("java.exe" if platform.system() == "Windows" else "java")).resolve()
+        java_executable = (
+            self.base_path
+            / pathlib.Path(*java_parts)
+            / "bin"
+            / ("java.exe" if platform.system() == "Windows" else "java")
+        ).resolve()
         if self.base_path not in java_executable.parents:
-            raise ValueError(f"resolved java executable escaped base path: {java_executable}")
+            raise ValueError(
+                f"resolved java executable escaped base path: {java_executable}"
+            )
         if not java_executable.is_file():
-            raise FileNotFoundError(f"java executable not found at expected path: {java_executable}")
+            raise FileNotFoundError(
+                f"java executable not found at expected path: {java_executable}"
+            )
         return java_executable
-    
+
     def _get_server_jar(self) -> pathlib.Path:
         server_uid = self._server_uid
         if not isinstance(server_uid, str):
@@ -430,8 +505,11 @@ class Instance:
         if server_jar.parent != jar_root:
             raise ValueError(f"resolved server jar escaped jar root: {server_jar}")
         if not server_jar.is_file():
-            raise FileNotFoundError(f"server jar not found at expected path: {server_jar}")
+            raise FileNotFoundError(
+                f"server jar not found at expected path: {server_jar}"
+            )
         return server_jar
+
 
 class InstanceManager:
     def __init__(self, base_path: pathlib.Path):
@@ -455,7 +533,7 @@ class InstanceManager:
 
     def get_instances(self) -> list[Instance]:
         return list(self.instances)
-    
+
     def get_instance_overviews(self) -> list[dict]:
         return [instance.build_info() for instance in self.instances]
 
@@ -473,7 +551,7 @@ class InstanceManager:
     def reload_instance(self, instance_uuid: uuid.UUID | str) -> Instance:
         normalized_uuid = self._normalize_uuid(instance_uuid)
         instance = Instance(normalized_uuid, self.base_path)
-        instance.save_instance_config() # ensure config is saved with any legacy conversions, if necessary
+        instance.save_instance_config()  # ensure config is saved with any legacy conversions, if necessary
         self._instances_by_uuid[normalized_uuid] = instance
         self.instances = list(self._instances_by_uuid.values())
         return instance
@@ -496,7 +574,7 @@ class InstanceManager:
             try:
                 instance_uuid = uuid.UUID(entry.name)
                 instance = Instance(instance_uuid, self.base_path)
-                instance.save_instance_config() # ensure config is saved with any legacy conversions, if necessary
+                instance.save_instance_config()  # ensure config is saved with any legacy conversions, if necessary
                 scanned_instances[instance_uuid] = instance
             except Exception as e:
                 print(f"skipping invalid instance directory '{entry}': {e}")
@@ -509,7 +587,14 @@ class InstanceManager:
         self.instances = list(self._instances_by_uuid.values())
         return self.get_instances()
 
-    def create_instance(self, server_uid: str, java_uid: str, name: str | None = None, memory: int | None = None, arguments: list[str] | None = None) -> Instance:
+    def create_instance(
+        self,
+        server_uid: str,
+        java_uid: str,
+        name: str | None = None,
+        memory: int | None = None,
+        arguments: list[str] | None = None,
+    ) -> Instance:
         instance = Instance.create_instance(
             self.base_path,
             server_uid,
@@ -526,7 +611,9 @@ class InstanceManager:
         normalized_uuid = self._normalize_uuid(instance_uuid)
         existing = self._instances_by_uuid.get(normalized_uuid)
         if existing is not None and existing.running:
-            raise RuntimeError(f"instance '{normalized_uuid}' is running; stop it before deletion")
+            raise RuntimeError(
+                f"instance '{normalized_uuid}' is running; stop it before deletion"
+            )
 
         Instance.delete_instance(self.base_path, normalized_uuid)
 
@@ -540,13 +627,13 @@ class InstanceManager:
 
     def stop_instance(self, instance_uuid: uuid.UUID | str) -> Instance:
         instance = self.get_instance(instance_uuid)
-        instance.stop() # see earlier notes about non-blocking instance stopping
+        instance.stop()  # see earlier notes about non-blocking instance stopping
         return instance
 
     def restart_instance(self, instance_uuid: uuid.UUID | str) -> Instance:
         instance = self.get_instance(instance_uuid)
         if instance.running:
-            instance.stop() # see earlier notes about non-blocking instance stopping
+            instance.stop()  # see earlier notes about non-blocking instance stopping
         instance.start()
         return instance
 
@@ -563,6 +650,8 @@ class InstanceManager:
 
         return errors
 
-    def get_instance_console(self, instance_uuid: uuid.UUID | str) -> list[ConsoleEntry]:
+    def get_instance_console(
+        self, instance_uuid: uuid.UUID | str
+    ) -> list[ConsoleEntry]:
         instance = self.get_instance(instance_uuid)
         return instance.console

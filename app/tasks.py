@@ -102,7 +102,9 @@ class TaskManager:
 
         return sorted(entries, key=lambda record: record.created_at)
 
-    def wait_for_task(self, task_id: str, timeout: float | None = None) -> TaskRecord | None:
+    def wait_for_task(
+        self, task_id: str, timeout: float | None = None
+    ) -> TaskRecord | None:
         with self._lock:
             entry = self._entries.get(task_id)
             if entry is None:
@@ -163,7 +165,9 @@ class TaskManager:
                     with self._lock:
                         entry.record.state = "failed"
                         entry.record.message = "task failed"
-                        entry.record.error = str(exception) or exception.__class__.__name__
+                        entry.record.error = (
+                            str(exception) or exception.__class__.__name__
+                        )
                         entry.record.finished_at = _utcnow()
                         self._prune_completed_tasks()
                     entry.done_event.set()
@@ -183,12 +187,15 @@ class TaskManager:
         completed_entries = [
             entry
             for entry in self._entries.values()
-            if entry.record.state in {"succeeded", "failed"} and entry.record.finished_at is not None
+            if entry.record.state in {"succeeded", "failed"}
+            and entry.record.finished_at is not None
         ]
         overflow = len(completed_entries) - self._max_completed_tasks
         if overflow <= 0:
             return
 
-        completed_entries.sort(key=lambda entry: entry.record.finished_at or entry.record.created_at)
+        completed_entries.sort(
+            key=lambda entry: entry.record.finished_at or entry.record.created_at
+        )
         for entry in completed_entries[:overflow]:
             self._entries.pop(entry.record.id, None)

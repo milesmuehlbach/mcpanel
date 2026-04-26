@@ -5,12 +5,17 @@ import uvicorn
 
 from app.paths import WORKING_PATH_ENV as APP_PATH_ENV
 
+
 def app_factory():
     from app.server import app
+
     return app
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Comprehensive Minecraft server management panel")
+    parser = argparse.ArgumentParser(
+        description="Comprehensive Minecraft server management panel"
+    )
     parser.add_argument(
         "--path",
         "-p",
@@ -27,4 +32,11 @@ if __name__ == "__main__":
 
     os.environ[APP_PATH_ENV] = str(args.path.resolve())
 
-    uvicorn.run("main:app_factory", host="0.0.0.0", port=8080, workers=1, reload=args.dev, factory=True) # WORKERS HAS TO BE 1 BC I'M A FUCKING DUMBASS
+    uvicorn.run(
+        "main:app_factory",
+        host="0.0.0.0",
+        port=8080,
+        workers=1,
+        reload=args.dev,
+        factory=True,
+    )  # WORKERS HAS TO BE 1 BC I'M A FUCKING DUMBASS

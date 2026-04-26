@@ -14,7 +14,7 @@
 	} = $props();
 </script>
 
-<Sidebar.MenuItem class="mr-2 ml-2 mt-0.5 md-0.5">
+<Sidebar.MenuItem class="md-0.5 mt-0.5 mr-2 ml-2">
 	<Sidebar.MenuButton isActive={selected}>
 		<Icon class="mr-2" />
 		{name}
