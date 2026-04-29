@@ -52,4 +52,5 @@ This project is still in its infancy. With that said, there's *lots* on the road
  - server management (ports, networking stuff, component/software management, etc)
  - user side settings (?) reset password etc
  - potential [playit.gg](https://playit.gg) support
+ - standalone binary support (not just running on docker)
  
