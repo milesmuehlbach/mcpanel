@@ -6,6 +6,9 @@ We mainly focus on ease of use; for example we automatically configure RAM sizes
 As of now, functionality is limited; currently you can create servers, manage multiple, start them, stop them, restart them, and access a full console. The majority of the work was in managing versions and downloads.
 
 you can access a demo at [mcpanel.milesmuehlbach.com](https://mcpanel.milesmuehlbach.com)
+  - username: demo
+  - password: password
+  - the main server will be accessible from `those-adding.gl.joinmc.link` if/when started.
 ### features
 
 - interactive server switching
