@@ -27,16 +27,16 @@ This is a beta release, and for hosting right now we mainly have docker support.
 Copy this `docker-compose.yml` into a new file.
 ```yml
 services:
-  ftcvanguard:
-    image: milesmuehlbach/ftcvanguard:master
-    container_name: ftcvanguard
+  mcpanel:
+    image: milesmuehlbach/mcpanel:lastest
+    container_name: mcpanel
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8080:8080"
     environment:
       PYTHONUNBUFFERED: "1"
     volumes:
-      - ./data:/app/data
+      - ./minecraft:/app/minecraft
 ```
 run `docker compose up` and wait for the server to run! It'll be running on port `8080`.
 The default server port is `25565`.
