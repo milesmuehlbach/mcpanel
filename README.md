@@ -28,7 +28,7 @@ Copy this `docker-compose.yml` into a new file.
 ```yml
 services:
   mcpanel:
-    image: milesmuehlbach/mcpanel:lastest
+    image: milesmuehlbach/mcpanel:latest
     container_name: mcpanel
     restart: unless-stopped
     ports:
