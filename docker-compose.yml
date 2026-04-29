@@ -1,0 +1,11 @@
+services:
+  mcpanel:
+    image: milesmuehlbach/mcpanel:lastest
+    container_name: mcpanel
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./minecraft:/app/minecraft
