@@ -1,6 +1,6 @@
 services:
   mcpanel:
-    image: milesmuehlbach/mcpanel:lastest
+    image: milesmuehlbach/mcpanel:latest
     container_name: mcpanel
     restart: unless-stopped
     ports:
