@@ -46,6 +46,7 @@ The default server port is `25565`.
 
 # roadmap
 This project is still in its infancy. With that said, there's *lots* on the roadmap.
+ - mod management
  - automatic component updates
  - properties management
  - file browsing
